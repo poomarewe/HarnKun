@@ -45,6 +45,42 @@ function selectWholeValue(event) {
   window.requestAnimationFrame(() => input.select());
 }
 
+function canvasToJpeg(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Could not compress this photo.'))),
+      'image/jpeg',
+      quality,
+    );
+  });
+}
+
+async function prepareBillUpload(file) {
+  const targetBytes = 3.8 * 1024 * 1024;
+  if (file.size <= targetBytes) return file;
+
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const maxSide = 1800;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext('2d', { alpha: false });
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  let blob = await canvasToJpeg(canvas, 0.8);
+  if (blob.size > targetBytes) blob = await canvasToJpeg(canvas, 0.62);
+  if (blob.size > targetBytes) throw new Error('This photo is still too large after compression.');
+
+  return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'bill'}.jpg`, {
+    type: 'image/jpeg',
+    lastModified: Date.now(),
+  });
+}
+
 function parseThaiBillText(ocrText) {
   return ocrText
     .split(/\r?\n/)
@@ -371,8 +407,16 @@ function App() {
       return;
     }
 
+    let uploadFile;
+    try {
+      uploadFile = await prepareBillUpload(file);
+    } catch (compressionError) {
+      setError(compressionError instanceof Error ? compressionError.message : 'Could not prepare this photo.');
+      return;
+    }
+
     if (billImageUrl) URL.revokeObjectURL(billImageUrl);
-    setBillImageUrl(URL.createObjectURL(file));
+    setBillImageUrl(URL.createObjectURL(uploadFile));
     setBillItems([]);
     setRawOcrText('');
     setOcrStatus('scanning');
@@ -386,12 +430,18 @@ function App() {
 
     try {
       const formData = new FormData();
-      formData.append('bill', file);
+      formData.append('bill', uploadFile);
       const response = await fetch('/api/scan-bill', {
         method: 'POST',
         body: formData,
       });
-      const result = await response.json();
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(`The scan service returned HTTP ${response.status} instead of JSON. Check the Vercel Function deployment.`);
+      }
       if (!response.ok) {
         if (response.status === 429 && result.retryAfter) setCooldownRemaining(result.retryAfter);
         throw new Error(result.message || `Scan failed with HTTP ${response.status}.`);
