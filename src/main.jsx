@@ -863,7 +863,7 @@ function App() {
                     <h2>Add your friends to <strong>{eventName}</strong></h2>
                   </div>
                 )}
-                {step === 'bill' && <h2>Scan your Thai bill</h2>}
+                {step === 'bill' && <h2>Scan your bill</h2>}
                 {step === 'split' && <h2>Who shared this?</h2>}
                 {step === 'result' && <h2>Payment summary</h2>}
               </div>
@@ -912,7 +912,7 @@ function App() {
                 {billImageUrl && (
                   <div className="bill-preview">
                     <img src={billImageUrl} alt="Selected bill" />
-                    <div><strong>{ocrStatus === 'scanning' ? 'Reading your bill…' : 'Bill photo'}</strong><span>Thai + English OCR</span></div>
+                    <div><strong>{ocrStatus === 'scanning' ? 'Reading your bill…' : 'Bill photo'}</strong><span></span></div>
                     {ocrStatus !== 'scanning' && (
                       <button type="button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
                         {cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'Change'}
