@@ -742,6 +742,14 @@ function App() {
     <main className="app">
       <div className="glow glow-one" />
       <div className="glow glow-two" />
+      <div className="baht-background" aria-hidden="true">
+        <span>฿</span>
+        <span>฿</span>
+        <span>฿</span>
+        <span>฿</span>
+        <span>฿</span>
+        <span>฿</span>
+      </div>
 
       <section className="hero" aria-label="Harn Kun home">
         <span className="eyebrow">WELCOME TO</span>
