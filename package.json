@@ -1,0 +1,22 @@
+{
+  "name": "harn-kun",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "vite build",
+    "start": "cross-env NODE_ENV=production node server.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "cross-env": "latest",
+    "dotenv": "^17.4.2",
+    "express": "latest",
+    "multer": "^2.2.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "sharp": "^0.35.3",
+    "vite": "latest"
+  }
+}
