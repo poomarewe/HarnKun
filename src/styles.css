@@ -70,6 +70,7 @@ img {
     linear-gradient(155deg, #fbfaff 0%, #f5f1ff 52%, #eee8fa 100%);
   background-size: 116% 116%;
   animation: background-breathe 14s ease-in-out infinite alternate;
+  transition: opacity 180ms ease;
 }
 
 .app::before {
@@ -271,6 +272,8 @@ img {
 }
 
 .create-button:focus-visible,
+.theme-button:focus-visible,
+.history-button:focus-visible,
 .close-button:focus-visible,
 .save-button:focus-visible,
 input:focus-visible {
@@ -1242,18 +1245,50 @@ input:focus-visible {
   position: absolute;
   right: max(24px, env(safe-area-inset-right));
   bottom: calc(max(25px, env(safe-area-inset-bottom)) + 78px);
-  min-width: 64px;
+  display: grid;
+  width: 34px;
+  min-width: 34px;
   height: 34px;
-  padding: 0 13px;
+  padding: 0;
   cursor: pointer;
+  place-items: center;
   border: 1px solid rgba(110, 54, 172, 0.18);
   border-radius: 12px;
   color: #65309e;
   background: rgba(250, 246, 255, 0.94);
   box-shadow: 0 7px 18px rgba(65, 31, 103, 0.14);
-  font-size: 0.68rem;
+  font-size: 0.9rem;
   font-weight: 800;
   transition: color 160ms ease, background 160ms ease, transform 160ms var(--ease-spring), box-shadow 160ms ease;
+}
+
+.theme-button {
+  position: absolute;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: calc(max(25px, env(safe-area-inset-bottom)) + 122px);
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  cursor: pointer;
+  place-items: center;
+  border: 1px solid rgba(110, 54, 172, 0.18);
+  border-radius: 12px;
+  color: #65309e;
+  background: rgba(250, 246, 255, 0.94);
+  box-shadow: 0 7px 18px rgba(65, 31, 103, 0.14);
+  font-size: 1rem;
+  transition: color 160ms ease, background 160ms ease, transform 160ms var(--ease-spring), box-shadow 160ms ease;
+}
+
+.theme-button span {
+  margin-top: -1px;
+  line-height: 1;
+}
+
+.history-button svg {
+  width: 17px;
+  height: 17px;
 }
 
 .history-panel {
@@ -1669,6 +1704,7 @@ input:focus-visible {
   }
 
   .history-button:hover,
+  .theme-button:hover,
   .history-back-button:hover {
     color: #54227f;
     background: #e9ddf3;
@@ -1870,6 +1906,11 @@ input:focus-visible {
     right: max(36px, env(safe-area-inset-right));
     bottom: calc(max(36px, env(safe-area-inset-bottom)) + 78px);
   }
+
+  .theme-button {
+    right: max(36px, env(safe-area-inset-right));
+    bottom: calc(max(36px, env(safe-area-inset-bottom)) + 122px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1883,5 +1924,277 @@ input:focus-visible {
 
   .title-face {
     font-family: 'Noto Sans Thai', sans-serif;
+  }
+}
+
+html.theme-changing .app {
+  opacity: 0.62;
+}
+
+html.theme-changing,
+html.theme-changing body {
+  transition: background-color 220ms ease;
+}
+
+html.theme-changing .operation-panel,
+html.theme-changing .history-panel,
+html.theme-changing button,
+html.theme-changing input,
+html.theme-changing .history-card,
+html.theme-changing .history-food-row,
+html.theme-changing .history-payment-row,
+html.theme-changing .payer-option,
+html.theme-changing .settlement-row {
+  transition-property: color, background-color, border-color, box-shadow, opacity !important;
+  transition-duration: 220ms !important;
+  transition-timing-function: ease !important;
+}
+
+html[data-theme='dark'] {
+  color: #f4eef9;
+  background: #100c16;
+}
+
+html[data-theme='dark'] body {
+  background: #100c16;
+}
+
+html[data-theme='dark'] .app {
+  background:
+    radial-gradient(circle at 50% 43%, rgba(102, 63, 139, 0.16) 0 14%, transparent 44%),
+    linear-gradient(155deg, #100c16 0%, #171020 52%, #1d1329 100%);
+}
+
+html[data-theme='dark'] .app::before {
+  opacity: 0.62;
+  background-image:
+    linear-gradient(rgba(184, 139, 224, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184, 139, 224, 0.1) 1px, transparent 1px);
+}
+
+html[data-theme='dark'] .baht-background span {
+  color: rgba(184, 139, 224, 0.1);
+}
+
+html[data-theme='dark'] .title-face {
+  background-image: linear-gradient(125deg, #b985f3 8%, #d5a7ff 47%, #8d52d1 92%);
+}
+
+html[data-theme='dark'] .eyebrow,
+html[data-theme='dark'] .hero p {
+  color: #ad9aba;
+}
+
+html[data-theme='dark'] .history-button,
+html[data-theme='dark'] .theme-button {
+  border-color: rgba(190, 140, 232, 0.2);
+  color: #d2a9f5;
+  background: rgba(31, 23, 42, 0.96);
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme='dark'] .create-button {
+  background: linear-gradient(145deg, #9a59df, #57238e);
+  box-shadow: 0 12px 27px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme='dark'] .overlay {
+  background: rgba(5, 3, 8, 0.62);
+}
+
+html[data-theme='dark'] .operation-panel,
+html[data-theme='dark'] .history-panel {
+  border-color: rgba(216, 180, 240, 0.12);
+  background: rgba(23, 17, 31, 0.98);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+}
+
+html[data-theme='dark'] .panel-handle {
+  background: #493b57;
+}
+
+html[data-theme='dark'] .panel-heading span,
+html[data-theme='dark'] .split-food-card > span,
+html[data-theme='dark'] .result-event > span {
+  color: #ae8bc7;
+}
+
+html[data-theme='dark'] .panel-heading h2,
+html[data-theme='dark'] .split-food-card h3 {
+  color: #f5eff9;
+}
+
+html[data-theme='dark'] .friends-title h2 strong,
+html[data-theme='dark'] .title-edit,
+html[data-theme='dark'] .manual-item-button {
+  color: #bc82ea;
+}
+
+html[data-theme='dark'] .small-back-button,
+html[data-theme='dark'] .select-all-button,
+html[data-theme='dark'] .history-back-button {
+  color: #c89bea;
+  background: #30233e;
+}
+
+html[data-theme='dark'] .close-button {
+  color: #bea9cb;
+  background: #2b2235;
+}
+
+html[data-theme='dark'] .operation-panel label,
+html[data-theme='dark'] .friends-heading,
+html[data-theme='dark'] .bill-list-heading,
+html[data-theme='dark'] .payer-heading,
+html[data-theme='dark'] .history-detail h3 {
+  color: #b7a8c1;
+}
+
+html[data-theme='dark'] .operation-panel input {
+  border-color: #3d3048;
+  color: #f3edf7;
+  background: #211927;
+}
+
+html[data-theme='dark'] .operation-panel input:focus {
+  border-color: #9f65cf;
+  background: #251c2d;
+  box-shadow: 0 0 0 4px rgba(169, 103, 218, 0.12);
+}
+
+html[data-theme='dark'] .operation-panel input::placeholder {
+  color: #796d81;
+}
+
+html[data-theme='dark'] .friend-chip {
+  border-color: #493653;
+  color: #d7b9eb;
+  background: #2a1f34;
+}
+
+html[data-theme='dark'] .empty-list,
+html[data-theme='dark'] .scan-intro p,
+html[data-theme='dark'] .history-message,
+html[data-theme='dark'] .history-empty,
+html[data-theme='dark'] .history-food-row span,
+html[data-theme='dark'] .history-food-row p {
+  color: #998ca2;
+}
+
+html[data-theme='dark'] .scan-start-options > button,
+html[data-theme='dark'] .history-card {
+  border-color: #403348;
+  color: #eee5f3;
+  background: linear-gradient(145deg, #241b2c, #1d1724);
+  box-shadow: none;
+}
+
+html[data-theme='dark'] .scan-start-options small,
+html[data-theme='dark'] .history-card-date,
+html[data-theme='dark'] .history-card > small {
+  color: #9e90a7;
+}
+
+html[data-theme='dark'] .bill-preview,
+html[data-theme='dark'] .split-food-card,
+html[data-theme='dark'] .result-event,
+html[data-theme='dark'] .history-detail-summary {
+  border-color: #403348;
+  background: linear-gradient(145deg, #261c2f, #201727);
+  box-shadow: none;
+}
+
+html[data-theme='dark'] .bill-preview strong,
+html[data-theme='dark'] .result-event strong,
+html[data-theme='dark'] .history-empty strong,
+html[data-theme='dark'] .history-food-row strong,
+html[data-theme='dark'] .history-payment-row strong,
+html[data-theme='dark'] .settlement-row > strong {
+  color: #eee6f3;
+}
+
+html[data-theme='dark'] .bill-preview span,
+html[data-theme='dark'] .result-event small,
+html[data-theme='dark'] .split-food-card small,
+html[data-theme='dark'] .history-detail-summary small {
+  color: #9f91a8;
+}
+
+html[data-theme='dark'] .upload-button,
+html[data-theme='dark'] .previous-button,
+html[data-theme='dark'] .done-button {
+  border-color: #45364f;
+  color: #c7a2df;
+  background: #2a2032;
+}
+
+html[data-theme='dark'] .bill-item button {
+  color: #bd91d7;
+  background: #30243a;
+}
+
+html[data-theme='dark'] .bill-total {
+  border-color: #3c3044;
+}
+
+html[data-theme='dark'] .bill-total span {
+  color: #a696b0;
+}
+
+html[data-theme='dark'] .bill-total strong,
+html[data-theme='dark'] .split-food-card strong,
+html[data-theme='dark'] .settlement-row > b,
+html[data-theme='dark'] .history-card > b,
+html[data-theme='dark'] .history-food-row > b,
+html[data-theme='dark'] .history-payment-row b,
+html[data-theme='dark'] .history-detail-summary strong {
+  color: #c68df1;
+}
+
+html[data-theme='dark'] .payer-option,
+html[data-theme='dark'] .settlement-row,
+html[data-theme='dark'] .history-food-row,
+html[data-theme='dark'] .history-payment-row {
+  border-color: #3e3246;
+  color: #ddd2e4;
+  background: #211a27;
+}
+
+html[data-theme='dark'] .payer-option.selected {
+  border-color: #925bc0;
+  color: #e5c7f7;
+  background: #32213f;
+}
+
+html[data-theme='dark'] .payer-check {
+  border-color: #5a4964;
+}
+
+html[data-theme='dark'] .settlement-row > span {
+  color: #c28be8;
+  background: #33243e;
+}
+
+html[data-theme='dark'] .add-button:disabled,
+html[data-theme='dark'] .save-button:disabled,
+html[data-theme='dark'] .scan-start-options > button:disabled,
+html[data-theme='dark'] .scan-actions button:disabled,
+html[data-theme='dark'] .bill-preview button:disabled,
+html[data-theme='dark'] .split-navigation button:disabled {
+  color: #716879;
+  background: #29232e;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-changing .operation-panel,
+  html.theme-changing .history-panel,
+  html.theme-changing button,
+  html.theme-changing input,
+  html.theme-changing .history-card,
+  html.theme-changing .history-food-row,
+  html.theme-changing .history-payment-row,
+  html.theme-changing .payer-option,
+  html.theme-changing .settlement-row {
+    transition-duration: 0.01ms !important;
   }
 }
