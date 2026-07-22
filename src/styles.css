@@ -1456,6 +1456,10 @@ input:focus-visible {
   font-size: 0.78rem;
 }
 
+.history-download-button {
+  margin-top: 14px;
+}
+
 /* Real mobile keyboards do not always resize 100dvh. Keep the normal panel
    dimensions and only move it inside the actually visible space. */
 .keyboard-open .overlay {

@@ -624,8 +624,13 @@ function App() {
     }
   };
 
-  const downloadSummary = async () => {
+  const downloadSummary = async (savedRecord = null) => {
     await document.fonts?.ready;
+    const summaryEventName = savedRecord?.eventName ?? eventName;
+    const summaryBillItems = savedRecord?.billItems ?? billItems;
+    const summaryAllocations = savedRecord?.allocations ?? allocations;
+    const summarySettlements = savedRecord?.settlements ?? settlements;
+    const summaryTotal = Number(savedRecord?.total ?? total);
     const width = 1080;
     const measuringCanvas = document.createElement('canvas');
     const measuringContext = measuringCanvas.getContext('2d');
@@ -649,12 +654,12 @@ function App() {
       return lines;
     };
 
-    const foodLayouts = billItems.map((item, index) => {
-      const payerLines = makePayerLines(allocations[index] || []);
+    const foodLayouts = summaryBillItems.map((item, index) => {
+      const payerLines = makePayerLines(summaryAllocations[index] || []);
       return { item, payerLines, height: 102 + payerLines.length * 34 };
     });
     const foodSectionHeight = foodLayouts.reduce((sum, layout) => sum + layout.height + 14, 0);
-    const height = Math.max(1200, 470 + foodSectionHeight + settlements.length * 92 + 230);
+    const height = Math.max(1200, 470 + foodSectionHeight + summarySettlements.length * 92 + 230);
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -670,7 +675,7 @@ function App() {
     context.fillText('หารกัน', 90, 100);
     context.fillStyle = '#241832';
     context.font = '800 68px "Noto Sans Thai", sans-serif';
-    context.fillText(eventName, 90, 190, 900);
+    context.fillText(summaryEventName, 90, 190, 900);
     context.fillStyle = '#8b7d96';
     context.font = '800 27px "Noto Sans Thai", sans-serif';
     context.fillText('รายการอาหาร', 90, 275);
@@ -705,7 +710,7 @@ function App() {
     context.fillText('ยอดที่ต้องจ่าย', 90, currentY);
     currentY += 38;
 
-    settlements.forEach((settlement, index) => {
+    summarySettlements.forEach((settlement, index) => {
       const y = currentY + index * 92;
       context.fillStyle = index % 2 === 0 ? '#ffffff' : '#f7f2fb';
       context.beginPath();
@@ -723,10 +728,10 @@ function App() {
 
     context.fillStyle = '#897a94';
     context.font = '600 26px "Noto Sans Thai", sans-serif';
-    context.fillText(`รวมทั้งสิ้น ฿${total.toFixed(2)}`, 90, height - 80);
+    context.fillText(`รวมทั้งสิ้น ฿${summaryTotal.toFixed(2)}`, 90, height - 80);
 
     const link = document.createElement('a');
-    link.download = `${eventName.replace(/[^A-Za-z0-9\u0E00-\u0E7F]+/g, '-') || 'harn-kun'}-summary.png`;
+    link.download = `${summaryEventName.replace(/[^A-Za-z0-9\u0E00-\u0E7F]+/g, '-') || 'harn-kun'}-summary.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   };
@@ -823,6 +828,9 @@ function App() {
                     </div>
                   ))}
                 </div>
+                <button type="button" className="download-button history-download-button" onClick={() => downloadSummary(selectedHistory)}>
+                  Download as picture
+                </button>
               </div>
             )}
           </section>
@@ -1031,7 +1039,7 @@ function App() {
                   ))}
                 </div>
 
-                <button type="button" className="download-button" onClick={downloadSummary}>Download as picture</button>
+                <button type="button" className="download-button" onClick={() => downloadSummary()}>Download as picture</button>
                 <button type="button" className="done-button" onClick={() => setIsCreating(false)}>Done</button>
               </div>
             )}
