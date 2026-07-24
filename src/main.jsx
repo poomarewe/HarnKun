@@ -55,6 +55,34 @@ function canvasToJpeg(canvas, quality) {
   });
 }
 
+function canvasToPng(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Could not create the summary picture.'))),
+      'image/png',
+    );
+  });
+}
+
+function isIosDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function downloadBlob(blob, fileName) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  // WebKit needs the object URL to remain alive until the download has started.
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
+
 async function prepareBillUpload(file) {
   const targetBytes = 3.8 * 1024 * 1024;
   if (file.size <= targetBytes) return file;
@@ -657,16 +685,18 @@ function App() {
   };
 
   const downloadSummary = async (savedRecord = null) => {
-    await document.fonts?.ready;
-    const summaryEventName = savedRecord?.eventName ?? eventName;
-    const summaryBillItems = savedRecord?.billItems ?? billItems;
-    const summaryAllocations = savedRecord?.allocations ?? allocations;
-    const summarySettlements = savedRecord?.settlements ?? settlements;
-    const summaryTotal = Number(savedRecord?.total ?? total);
-    const width = 1080;
-    const measuringCanvas = document.createElement('canvas');
-    const measuringContext = measuringCanvas.getContext('2d');
-    measuringContext.font = '600 27px "Noto Sans Thai", sans-serif';
+    setError('');
+
+    try {
+      const summaryEventName = savedRecord?.eventName ?? eventName;
+      const summaryBillItems = savedRecord?.billItems ?? billItems;
+      const summaryAllocations = savedRecord?.allocations ?? allocations;
+      const summarySettlements = savedRecord?.settlements ?? settlements;
+      const summaryTotal = Number(savedRecord?.total ?? total);
+      const width = 1080;
+      const measuringCanvas = document.createElement('canvas');
+      const measuringContext = measuringCanvas.getContext('2d');
+      measuringContext.font = '600 27px "Noto Sans Thai", sans-serif';
 
     const makePayerLines = (selectedFriends) => {
       const prefix = `หาร ${selectedFriends.length} คน: `;
@@ -762,10 +792,38 @@ function App() {
     context.font = '600 26px "Noto Sans Thai", sans-serif';
     context.fillText(`รวมทั้งสิ้น ฿${summaryTotal.toFixed(2)}`, 90, height - 80);
 
-    const link = document.createElement('a');
-    link.download = `${summaryEventName.replace(/[^A-Za-z0-9\u0E00-\u0E7F]+/g, '-') || 'harn-kun'}-summary.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+      const safeEventName = summaryEventName.replace(/[^A-Za-z0-9\u0E00-\u0E7F]+/g, '-') || 'harn-kun';
+      const fileName = `${safeEventName}-summary.png`;
+      const blob = await canvasToPng(canvas);
+
+      if (isIosDevice() && typeof navigator.share === 'function') {
+        const file = new File([blob], fileName, { type: 'image/png' });
+        let canShareFile = true;
+
+        if (typeof navigator.canShare === 'function') {
+          try {
+            canShareFile = navigator.canShare({ files: [file] });
+          } catch {
+            canShareFile = false;
+          }
+        }
+
+        if (canShareFile) {
+          try {
+            await navigator.share({ files: [file] });
+            return;
+          } catch (shareError) {
+            if (shareError?.name === 'AbortError') return;
+            console.warn('Could not open the iOS share sheet:', shareError);
+          }
+        }
+      }
+
+      downloadBlob(blob, fileName);
+    } catch (downloadError) {
+      console.error('Could not export summary picture:', downloadError);
+      setError(downloadError instanceof Error ? downloadError.message : 'Could not download the summary picture.');
+    }
   };
 
   const stepNumber = step === 'event' ? 1 : step === 'friends' ? 2 : 3;
@@ -880,6 +938,7 @@ function App() {
                     </div>
                   ))}
                 </div>
+                {error && <p className="form-error" role="alert">{error}</p>}
                 <button type="button" className="download-button history-download-button" onClick={() => downloadSummary(selectedHistory)}>
                   Download as picture
                 </button>
@@ -1091,6 +1150,7 @@ function App() {
                   ))}
                 </div>
 
+                {error && <p className="form-error" role="alert">{error}</p>}
                 <button type="button" className="download-button" onClick={() => downloadSummary()}>Download as picture</button>
                 <button type="button" className="done-button" onClick={() => setIsCreating(false)}>Done</button>
               </div>
