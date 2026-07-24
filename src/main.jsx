@@ -262,6 +262,22 @@ async function readHistoryRecords() {
   });
 }
 
+async function clearHistoryRecords() {
+  const database = await openHistoryDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(HISTORY_STORE, 'readwrite');
+    transaction.objectStore(HISTORY_STORE).clear();
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error);
+    };
+  });
+}
+
 function App() {
   const [isCreating, setIsCreating] = useState(false);
   const [historyView, setHistoryView] = useState(null);
@@ -383,6 +399,24 @@ function App() {
   const closeHistory = () => {
     setHistoryView(null);
     setSelectedHistory(null);
+  };
+
+  const clearHistory = async () => {
+    if (historyRecords.length === 0) return;
+    if (!window.confirm('Clear all history stored on this device?')) return;
+
+    setHistoryLoading(true);
+    try {
+      await clearHistoryRecords();
+      setHistoryRecords([]);
+      setSelectedHistory(null);
+      setHistoryView('list');
+    } catch (historyError) {
+      console.error('Could not clear local history:', historyError);
+      window.alert('Could not clear history. Please try again.');
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const closePanel = () => {
@@ -822,7 +856,12 @@ function App() {
         </SpecularButton>
       </section>
 
-      <StaggeredMenu onOpen={openHistory} onClose={closeHistory}>
+      <StaggeredMenu
+        canClearHistory={historyRecords.length > 0 && !historyLoading}
+        onClearHistory={clearHistory}
+        onOpen={openHistory}
+        onClose={closeHistory}
+      >
         {historyView && (
           <div className="staggered-history-content">
             <div className="panel-heading history-panel-heading">

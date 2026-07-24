@@ -3506,10 +3506,19 @@ html .bill-footer-actions .save-button {
 .staggered-menu.is-open .staggered-history-content .history-card:nth-child(4) { animation-delay: 460ms; }
 .staggered-menu.is-open .staggered-history-content .history-card:nth-child(n + 5) { animation-delay: 520ms; }
 
+.staggered-menu-footer-actions {
+  display: flex;
+  width: 100%;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.staggered-menu-clear,
 .staggered-menu-instagram {
   flex: none;
-  align-self: flex-start;
-  margin-top: 18px;
   color: #8f8098;
   font-size: 0.64rem;
   font-weight: 700;
@@ -3518,10 +3527,24 @@ html .bill-footer-actions .save-button {
   transition: color 160ms ease;
 }
 
+.staggered-menu-clear {
+  padding: 0;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+}
+
+.staggered-menu-clear:hover:not(:disabled),
 .staggered-menu-instagram:hover {
   color: #d59bf4;
 }
 
+.staggered-menu-clear:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.staggered-menu-clear:focus-visible,
 .staggered-menu-instagram:focus-visible {
   outline: 2px solid rgba(222, 174, 255, 0.72);
   outline-offset: 4px;

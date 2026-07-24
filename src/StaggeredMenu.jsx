@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
-export default function StaggeredMenu({ children, onOpen, onClose }) {
+export default function StaggeredMenu({
+  children,
+  canClearHistory = false,
+  onClearHistory,
+  onOpen,
+  onClose,
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef(null);
   const panelRef = useRef(null);
@@ -71,15 +77,26 @@ export default function StaggeredMenu({ children, onOpen, onClose }) {
       >
         {children}
 
-        <a
-          className="staggered-menu-instagram"
-          href="https://www.instagram.com/https.sanin/"
-          target="_blank"
-          rel="noreferrer"
-          tabIndex={isOpen ? 0 : -1}
-        >
-          Instagram · @https.sanin
-        </a>
+        <div className="staggered-menu-footer-actions">
+          <a
+            className="staggered-menu-instagram"
+            href="https://www.instagram.com/https.sanin/"
+            target="_blank"
+            rel="noreferrer"
+            tabIndex={isOpen ? 0 : -1}
+          >
+            Instagram · @https.sanin
+          </a>
+          <button
+            className="staggered-menu-clear"
+            type="button"
+            disabled={!canClearHistory}
+            tabIndex={isOpen ? 0 : -1}
+            onClick={onClearHistory}
+          >
+            Clear history
+          </button>
+        </div>
       </aside>
     </div>
   );
