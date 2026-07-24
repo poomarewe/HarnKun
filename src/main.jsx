@@ -1,5 +1,10 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import HeroTitle from './HeroTitle';
+import { BitsButton, BitsSurface, ClickSpark } from './ReactBitsUI';
+import Silk from './Silk';
+import SpecularButton from './SpecularButton';
+import StaggeredMenu from './StaggeredMenu';
 import './styles.css';
 
 const THAI_DIGITS = { '๐': '0', '๑': '1', '๒': '2', '๓': '3', '๔': '4', '๕': '5', '๖': '6', '๗': '7', '๘': '8', '๙': '9' };
@@ -257,18 +262,7 @@ async function readHistoryRecords() {
   });
 }
 
-function getInitialTheme() {
-  try {
-    const savedTheme = localStorage.getItem('harn-kun-theme');
-    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
-  } catch {
-    // Storage may be unavailable in private browsing; system preference still works.
-  }
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
 function App() {
-  const [theme, setTheme] = useState(getInitialTheme);
   const [isCreating, setIsCreating] = useState(false);
   const [historyView, setHistoryView] = useState(null);
   const [historyRecords, setHistoryRecords] = useState([]);
@@ -298,17 +292,6 @@ function App() {
     () => billItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
     [billItems],
   );
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#100c16' : '#f7f4ff');
-    try {
-      localStorage.setItem('harn-kun-theme', theme);
-    } catch {
-      // The theme remains active for this visit even if storage is blocked.
-    }
-  }, [theme]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -400,16 +383,6 @@ function App() {
   const closeHistory = () => {
     setHistoryView(null);
     setSelectedHistory(null);
-  };
-
-  const toggleTheme = () => {
-    const root = document.documentElement;
-    if (root.classList.contains('theme-changing')) return;
-    root.classList.add('theme-changing');
-    window.setTimeout(() => {
-      setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
-    }, 150);
-    window.setTimeout(() => root.classList.remove('theme-changing'), 220);
   };
 
   const closePanel = () => {
@@ -829,69 +802,47 @@ function App() {
   const stepNumber = step === 'event' ? 1 : step === 'friends' ? 2 : 3;
 
   return (
-    <main className="app">
-      <div className="glow glow-one" />
-      <div className="glow glow-two" />
-      <div className="baht-background" aria-hidden="true">
-        <span>฿</span>
-        <span>฿</span>
-        <span>฿</span>
-        <span>฿</span>
-        <span>฿</span>
-        <span>฿</span>
+    <ClickSpark as="main" className="app">
+      <div className="silk-background" aria-hidden="true">
+        <Silk color="#A855F7" />
       </div>
+      <div className="intro-blackout" aria-hidden="true" />
 
       <section className="hero" aria-label="Harn Kun home">
         <span className="eyebrow">WELCOME TO</span>
-        <h1 className="animated-title" aria-label="หาร กัน">
-          <span className="title-face" aria-hidden="true">หาร กัน</span>
-        </h1>
+        <HeroTitle text="Harn Kun" />
         <p>Make every bill effortless.</p>
+        <SpecularButton
+          className="hero-start-button"
+          aria-label="Start splitting a bill"
+          aria-expanded={isCreating}
+          onClick={openPanel}
+        >
+          Start splitting <span aria-hidden="true">→</span>
+        </SpecularButton>
       </section>
 
-      <button className="create-button" type="button" aria-label="Create a new operation" aria-expanded={isCreating} onClick={openPanel}>
-        <span aria-hidden="true">+</span>
-      </button>
-
-      <button className="history-button" type="button" aria-label="View operation history" aria-expanded={Boolean(historyView)} onClick={openHistory}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-hourglass-split" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M2.5 15a.5.5 0 1 1 0-1h1v-1a4.5 4.5 0 0 1 2.557-4.06c.29-.139.443-.377.443-.59v-.7c0-.213-.154-.451-.443-.59A4.5 4.5 0 0 1 3.5 3V2h-1a.5.5 0 0 1 0-1h11a.5.5 0 0 1 0 1h-1v1a4.5 4.5 0 0 1-2.557 4.06c-.29.139-.443.377-.443.59v.7c0 .213.154.451.443.59A4.5 4.5 0 0 1 12.5 13v1h1a.5.5 0 0 1 0 1zm2-13v1c0 .537.12 1.045.337 1.5h6.326c.216-.455.337-.963.337-1.5V2zm3 6.35c0 .701-.478 1.236-1.011 1.492A3.5 3.5 0 0 0 4.5 13s.866-1.299 3-1.48zm1 0v3.17c2.134.181 3 1.48 3 1.48a3.5 3.5 0 0 0-1.989-3.158C8.978 9.586 8.5 9.052 8.5 8.351z" />
-        </svg>
-      </button>
-
-      <button
-        className="theme-button"
-        type="button"
-        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-        title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-        onClick={toggleTheme}
-      >
-        <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
-      </button>
-
-      {historyView && (
-        <div className="overlay history-overlay" role="presentation" onMouseDown={closeHistory}>
-          <section className="history-panel" aria-label="Operation history" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="panel-handle" />
+      <StaggeredMenu onOpen={openHistory} onClose={closeHistory}>
+        {historyView && (
+          <div className="staggered-history-content">
             <div className="panel-heading history-panel-heading">
               <div>
                 <div className="panel-meta"><span>ON THIS DEVICE</span></div>
                 <h2>{historyView === 'detail' ? selectedHistory?.eventName : 'History'}</h2>
               </div>
-              <button type="button" className="close-button" onClick={closeHistory} aria-label="Close history">×</button>
             </div>
 
             {historyView === 'list' && (
               <div className="history-list">
                 {historyLoading && <p className="history-message">Loading history…</p>}
                 {!historyLoading && historyRecords.length === 0 && (
-                  <div className="history-empty">
+                  <BitsSurface className="history-empty">
                     <strong>No history yet</strong>
                     <p>Your completed bill splits will appear here automatically.</p>
-                  </div>
+                  </BitsSurface>
                 )}
                 {!historyLoading && historyRecords.map((record) => (
-                  <button
+                  <BitsButton
                     type="button"
                     className="history-card"
                     key={record.id}
@@ -905,52 +856,52 @@ function App() {
                     <small>{record.friends.length} friends · {record.billItems.length} foods</small>
                     <b>฿{Number(record.total).toFixed(2)}</b>
                     <i aria-hidden="true">›</i>
-                  </button>
+                  </BitsButton>
                 ))}
               </div>
             )}
 
             {historyView === 'detail' && selectedHistory && (
               <div className="history-detail">
-                <button type="button" className="history-back-button" onClick={() => setHistoryView('list')}>← All history</button>
+                <BitsButton type="button" className="history-back-button" onClick={() => setHistoryView('list')}>← All history</BitsButton>
 
-                <div className="history-detail-summary">
+                <BitsSurface className="history-detail-summary">
                   <div><span>TOTAL</span><strong>฿{Number(selectedHistory.total).toFixed(2)}</strong></div>
                   <small>{new Date(selectedHistory.updatedAt).toLocaleString()}</small>
-                </div>
+                </BitsSurface>
 
                 <h3>Food and sharing</h3>
                 <div className="history-food-list">
                   {selectedHistory.billItems.map((item, index) => (
-                    <article className="history-food-row" key={`${item.name}-${index}`}>
+                    <BitsSurface as="article" className="history-food-row" key={`${item.name}-${index}`}>
                       <div><strong>{item.name}</strong><span>×{item.quantity} · split between {(selectedHistory.allocations[index] || []).length}</span></div>
                       <b>฿{Number(item.amount).toFixed(2)}</b>
                       <p>{(selectedHistory.allocations[index] || []).join(', ') || 'No one selected'}</p>
-                    </article>
+                    </BitsSurface>
                   ))}
                 </div>
 
                 <h3>Who pays</h3>
                 <div className="history-payment-list">
                   {selectedHistory.settlements.map((settlement) => (
-                    <div className="history-payment-row" key={settlement.name}>
+                    <BitsSurface className="history-payment-row" key={settlement.name}>
                       <strong>{settlement.name}</strong><b>฿{Number(settlement.amount).toFixed(2)}</b>
-                    </div>
+                    </BitsSurface>
                   ))}
                 </div>
                 {error && <p className="form-error" role="alert">{error}</p>}
-                <button type="button" className="download-button history-download-button" onClick={() => downloadSummary(selectedHistory)}>
+                <BitsButton type="button" className="download-button history-download-button" onClick={() => downloadSummary(selectedHistory)}>
                   Download as picture
-                </button>
+                </BitsButton>
               </div>
             )}
-          </section>
-        </div>
-      )}
+          </div>
+        )}
+      </StaggeredMenu>
 
       {isCreating && (
         <div className="overlay" role="presentation" onMouseDown={closePanel}>
-          <section className={`operation-panel step-${step}`} aria-label="New operation" onMouseDown={(event) => event.stopPropagation()}>
+          <BitsSurface as="section" className={`operation-panel step-${step}`} aria-label="New operation" onMouseDown={(event) => event.stopPropagation()}>
             <div className="panel-handle" />
             <div className="panel-heading">
               <div>
@@ -958,7 +909,7 @@ function App() {
                   <span>
                     {step === 'split' ? `FOOD ${splitIndex + 1} OF ${billItems.length}` : step === 'result' ? 'ALL DONE' : `STEP ${stepNumber} OF 3`}
                   </span>
-                  {step !== 'event' && <button type="button" className="small-back-button" disabled={isSaving || ocrStatus === 'scanning'} onClick={goBack}>← Back</button>}
+                  {step !== 'event' && <BitsButton type="button" className="small-back-button" disabled={isSaving || ocrStatus === 'scanning'} onClick={goBack}>← Back</BitsButton>}
                 </div>
                 {step === 'event' && <h2>Name your event</h2>}
                 {step === 'friends' && (
@@ -970,14 +921,14 @@ function App() {
                 {step === 'split' && <h2>Who shared this?</h2>}
                 {step === 'result' && <h2>Payment summary</h2>}
               </div>
-              <button type="button" className="close-button" onClick={closePanel} aria-label="Close">×</button>
+              <BitsButton type="button" className="close-button" onClick={closePanel} aria-label="Close">×</BitsButton>
             </div>
 
             {step === 'event' && (
               <form onSubmit={continueToFriends}>
                 <label htmlFor="event-name">Event name</label>
                 <input ref={inputRef} id="event-name" value={eventName} onChange={(event) => setEventName(event.target.value)} type="text" placeholder="e.g. Beach trip" autoComplete="off" enterKeyHint="next" maxLength="80" required />
-                <button className="save-button" type="submit">OK, add friends</button>
+                <BitsButton className="save-button" type="submit">OK, add friends</BitsButton>
               </form>
             )}
 
@@ -987,23 +938,23 @@ function App() {
                   <label htmlFor="friend-name">Friend's name</label>
                   <div className="friend-input-row">
                     <input ref={inputRef} id="friend-name" value={friendName} onChange={(event) => setFriendName(event.target.value)} type="text" placeholder="Type a name" autoComplete="off" enterKeyHint="done" maxLength="60" disabled={friends.length >= 100} />
-                    <button type="submit" className="add-button" disabled={!friendName.trim() || friends.length >= 100}>Add</button>
+                    <BitsButton type="submit" className="add-button" disabled={!friendName.trim() || friends.length >= 100}>Add</BitsButton>
                   </div>
                 </form>
 
                 <div className="friends-heading"><span>Friends</span><strong>{friends.length} / 100</strong></div>
                 <div className="friend-list" aria-live="polite">
                   {friends.length === 0 ? <p className="empty-list">Add at least 2 people to continue.</p> : friends.map((friend, index) => (
-                    <button key={`${friend}-${index}`} type="button" className="friend-chip" onClick={() => removeFriend(index)}>
+                    <BitsButton key={`${friend}-${index}`} type="button" className="friend-chip" onClick={() => removeFriend(index)}>
                       <span>{friend}</span><b aria-label={`Remove ${friend}`}>×</b>
-                    </button>
+                    </BitsButton>
                   ))}
                 </div>
 
                 {error && <p className="form-error" role="alert">{error}</p>}
-                <button className="save-button apply-button" type="button" disabled={friends.length < 2} onClick={continueToBill}>
+                <BitsButton className="save-button apply-button" type="button" disabled={friends.length < 2} onClick={continueToBill}>
                   {friends.length < 2 ? `Add ${2 - friends.length} more` : 'Continue to bill'}
-                </button>
+                </BitsButton>
               </div>
             )}
 
@@ -1013,41 +964,41 @@ function App() {
                 <input ref={uploadInputRef} className="hidden-file-input" type="file" accept="image/*" onChange={chooseBill} />
 
                 {billImageUrl && (
-                  <div className="bill-preview">
+                  <BitsSurface className="bill-preview">
                     <img src={billImageUrl} alt="Selected bill" />
                     <div><strong>{ocrStatus === 'scanning' ? 'Reading your bill…' : 'Bill photo'}</strong><span></span></div>
                     {ocrStatus !== 'scanning' && (
-                      <button type="button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
+                      <BitsButton type="button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
                         {cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'Change'}
-                      </button>
+                      </BitsButton>
                     )}
-                  </div>
+                  </BitsSurface>
                 )}
 
                 {ocrStatus === 'scanning' ? (
-                  <div className="scan-progress" aria-live="polite">
+                  <BitsSurface className="scan-progress" aria-live="polite">
                     <div><span style={{ width: `${Math.round(ocrProgress * 100)}%` }} /></div>
                     <p>กำลังอ่านใบเสร็จ… {Math.round(ocrProgress * 100)}%</p>
-                  </div>
+                  </BitsSurface>
                 ) : (
                   <>
                     {!billImageUrl && ocrStatus === 'idle' && (
                       <div className="scan-start-options">
-                        <button type="button" disabled={cooldownRemaining > 0} onClick={() => cameraInputRef.current?.click()}>
+                        <BitsButton type="button" disabled={cooldownRemaining > 0} onClick={() => cameraInputRef.current?.click()}>
                           <span className="scan-option-icon" aria-hidden="true">●</span>
                           <span><strong>{cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'Take picture'}</strong><small>Open your phone camera</small></span>
                           <b aria-hidden="true">›</b>
-                        </button>
-                        <button type="button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
+                        </BitsButton>
+                        <BitsButton type="button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
                           <span className="scan-option-icon upload-icon" aria-hidden="true">↑</span>
                           <span><strong>Upload photo</strong><small>Choose a bill from your device</small></span>
                           <b aria-hidden="true">›</b>
-                        </button>
-                        <button type="button" onClick={addManualItem}>
+                        </BitsButton>
+                        <BitsButton type="button" onClick={addManualItem}>
                           <span className="scan-option-icon manual-icon" aria-hidden="true">+</span>
                           <span><strong>Manual add</strong><small>Enter food and prices yourself</small></span>
                           <b aria-hidden="true">›</b>
-                        </button>
+                        </BitsButton>
                       </div>
                     )}
 
@@ -1056,24 +1007,33 @@ function App() {
                         <div className="bill-list-heading"><span>Food detected</span><strong>{billItems.length} items</strong></div>
                         <div className="bill-list">
                           {billItems.map((item, index) => (
-                            <div className="bill-item" key={`bill-item-${index}`}>
-                              <input aria-label={`Food ${index + 1}`} value={item.name} onChange={(event) => updateBillItem(index, 'name', event.target.value)} placeholder="ชื่ออาหาร" />
-                              <input aria-label={`Quantity ${index + 1}`} type="number" min="1" inputMode="numeric" value={item.quantity} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'quantity', event.target.value)} />
-                              <input aria-label={`Amount ${index + 1}`} type="number" min="0" step="0.01" inputMode="decimal" value={item.amount} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'amount', event.target.value)} />
-                              <button type="button" onClick={() => removeBillItem(index)} aria-label={`Remove ${item.name || 'item'}`}>×</button>
-                            </div>
+                            <BitsSurface className="bill-item" key={`bill-item-${index}`}>
+                              <label className="bill-field bill-field-name">
+                                <span>Food</span>
+                                <input aria-label={`Food ${index + 1}`} value={item.name} onChange={(event) => updateBillItem(index, 'name', event.target.value)} placeholder="Food name" />
+                              </label>
+                              <label className="bill-field bill-field-quantity">
+                                <span>Qty</span>
+                                <input aria-label={`Quantity ${index + 1}`} type="number" min="1" inputMode="numeric" value={item.quantity} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'quantity', event.target.value)} />
+                              </label>
+                              <label className="bill-field bill-field-amount">
+                                <span>Price</span>
+                                <input aria-label={`Amount ${index + 1}`} type="number" min="0" step="0.01" inputMode="decimal" value={item.amount} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'amount', event.target.value)} />
+                              </label>
+                              <BitsButton className="bill-remove-button" type="button" onClick={() => removeBillItem(index)} aria-label={`Remove ${item.name || 'item'}`}>×</BitsButton>
+                            </BitsSurface>
                           ))}
                         </div>
-                        <button type="button" className="manual-item-button" onClick={addManualItem}>+ Add food manually</button>
-                        <div className="bill-total"><span>SUM</span><strong>฿{total.toFixed(2)}</strong></div>
+                        <BitsButton type="button" className="manual-item-button" onClick={addManualItem}>+ Add food manually</BitsButton>
+                        <BitsSurface className="bill-total"><span>SUM</span><strong>฿{total.toFixed(2)}</strong></BitsSurface>
                       </>
                     )}
 
                     {billImageUrl && ocrStatus === 'idle' && (
                       <div className="scan-actions">
-                        <button type="button" className="upload-button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
+                        <BitsButton type="button" className="upload-button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
                           {cooldownRemaining > 0 ? `Try again in ${cooldownRemaining}s` : 'Try another photo'}
-                        </button>
+                        </BitsButton>
                       </div>
                     )}
                   </>
@@ -1082,7 +1042,7 @@ function App() {
                 {error && <p className="form-error" role="alert">{error}</p>}
                 {ocrStatus !== 'scanning' && (
                   <div className="bill-footer-actions">
-                    {(ocrStatus === 'review' || billItems.length > 0) && <button className="save-button" type="button" disabled={!billItems.some((item) => item.name.trim())} onClick={startSplitting}>Confirm & split</button>}
+                    {(ocrStatus === 'review' || billItems.length > 0) && <BitsButton className="save-button" type="button" disabled={!billItems.some((item) => item.name.trim())} onClick={startSplitting}>Confirm & split</BitsButton>}
                   </div>
                 )}
               </div>
@@ -1090,22 +1050,22 @@ function App() {
 
             {step === 'split' && billItems[splitIndex] && (
               <div className="split-step">
-                <div className="split-food-card">
+                <BitsSurface className="split-food-card">
                   <span>FOOD</span>
                   <h3>{billItems[splitIndex].name}</h3>
                   <div>
                     <small>Quantity {billItems[splitIndex].quantity}</small>
                     <strong>฿{Number(billItems[splitIndex].amount).toFixed(2)}</strong>
                   </div>
-                </div>
+                </BitsSurface>
 
                 <div className="payer-heading">
                   <span>Who needs to pay?</span>
                   <div>
                     <strong>{(allocations[splitIndex] || []).length} selected</strong>
-                    <button type="button" className="select-all-button" onClick={toggleAllFriendsForItem}>
+                    <BitsButton type="button" className="select-all-button" onClick={toggleAllFriendsForItem}>
                       {(allocations[splitIndex] || []).length === friends.length ? 'Clear all' : 'Select all'}
-                    </button>
+                    </BitsButton>
                   </div>
                 </div>
 
@@ -1113,52 +1073,52 @@ function App() {
                   {friends.map((friend) => {
                     const isSelected = (allocations[splitIndex] || []).includes(friend);
                     return (
-                      <button key={friend} type="button" className={`payer-option${isSelected ? ' selected' : ''}`} aria-pressed={isSelected} onClick={() => toggleFriendForItem(friend)}>
+                      <BitsButton key={friend} type="button" className={`payer-option${isSelected ? ' selected' : ''}`} aria-pressed={isSelected} onClick={() => toggleFriendForItem(friend)}>
                         <span className="payer-check" aria-hidden="true">{isSelected ? '✓' : ''}</span>
                         <strong>{friend}</strong>
                         {isSelected && <small>฿{(Number(billItems[splitIndex].amount) / (allocations[splitIndex] || []).length).toFixed(2)}</small>}
-                      </button>
+                      </BitsButton>
                     );
                   })}
                 </div>
 
                 {error && <p className="form-error" role="alert">{error}</p>}
                 <div className="split-navigation">
-                  <button type="button" className="previous-button" disabled={splitIndex === 0 || isSaving} onClick={goToPreviousFood}>Previous</button>
-                  <button type="button" className="next-button" disabled={(allocations[splitIndex] || []).length === 0 || isSaving} onClick={goToNextFood}>
+                  <BitsButton type="button" className="previous-button" disabled={splitIndex === 0 || isSaving} onClick={goToPreviousFood}>Previous</BitsButton>
+                  <BitsButton type="button" className="next-button" disabled={(allocations[splitIndex] || []).length === 0 || isSaving} onClick={goToNextFood}>
                     {isSaving ? 'Calculating…' : splitIndex === billItems.length - 1 ? 'Calculate' : 'Next food'}
-                  </button>
+                  </BitsButton>
                 </div>
               </div>
             )}
 
             {step === 'result' && (
               <div className="result-step">
-                <div className="result-event">
+                <BitsSurface className="result-event">
                   <span>EVENT</span>
                   <strong>{eventName}</strong>
                   <small>Total ฿{total.toFixed(2)}</small>
-                </div>
+                </BitsSurface>
 
                 <div className="settlement-list">
                   {settlements.map((settlement, index) => (
-                    <div className="settlement-row" key={settlement.name}>
+                    <BitsSurface className="settlement-row" key={settlement.name}>
                       <span>{index + 1}</span>
                       <strong>{settlement.name}</strong>
                       <b>฿{settlement.amount.toFixed(2)}</b>
-                    </div>
+                    </BitsSurface>
                   ))}
                 </div>
 
                 {error && <p className="form-error" role="alert">{error}</p>}
-                <button type="button" className="download-button" onClick={() => downloadSummary()}>Download as picture</button>
-                <button type="button" className="done-button" onClick={() => setIsCreating(false)}>Done</button>
+                <BitsButton type="button" className="download-button" onClick={() => downloadSummary()}>Download as picture</BitsButton>
+                <BitsButton type="button" className="done-button" onClick={() => setIsCreating(false)}>Done</BitsButton>
               </div>
             )}
-          </section>
+          </BitsSurface>
         </div>
       )}
-    </main>
+    </ClickSpark>
   );
 }
 
