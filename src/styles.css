@@ -2,6 +2,7 @@
 
 :root {
   --visible-height: 100dvh;
+  --visible-offset-top: 0px;
   --purple-950: #35106f;
   --purple-800: #5923ad;
   --purple-600: #7b3fd2;
@@ -330,6 +331,7 @@ input:focus-visible {
   margin-bottom: 22px;
 }
 
+.panel-heading-content,
 .panel-heading > div:first-child {
   min-width: 0;
   flex: 1;
@@ -343,14 +345,19 @@ input:focus-visible {
 }
 
 .small-back-button {
-  padding: 3px 7px;
+  display: grid;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
   cursor: pointer;
   border: 0;
-  border-radius: 7px;
-  color: #7d4ba7;
-  background: #f0e8f6;
-  font-size: 0.6rem;
-  font-weight: 800;
+  place-items: center;
+  border-radius: 50%;
+  color: #705b86;
+  background: #eee8f5;
+  font-size: 1.25rem;
+  line-height: 1;
   transition: color 160ms ease, background 160ms ease, transform 160ms var(--ease-spring);
 }
 
@@ -1428,14 +1435,19 @@ input:focus-visible {
 
 .history-back-button {
   margin-bottom: 10px;
-  padding: 5px 8px;
+  display: grid;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
   cursor: pointer;
   border: 0;
-  border-radius: 8px;
-  color: #74409d;
+  place-items: center;
+  border-radius: 50%;
+  color: #705b86;
   background: #eee5f5;
-  font-size: 0.64rem;
-  font-weight: 800;
+  font-size: 1.25rem;
+  line-height: 1;
 }
 
 .history-detail-summary {
@@ -2199,6 +2211,8 @@ html .bill-preview button:disabled {
 }
 
 html .close-button,
+html .small-back-button,
+html .history-back-button,
 html .theme-button,
 html .history-button {
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -2209,7 +2223,9 @@ html .history-button {
   -webkit-backdrop-filter: blur(12px);
 }
 
-html .close-button {
+html .close-button,
+html .small-back-button,
+html .history-back-button {
   color: #6d477e;
   background: rgba(247, 239, 251, 0.92);
   box-shadow: none;
@@ -2249,8 +2265,6 @@ html .create-button span {
   font-size: 1.65rem;
 }
 
-html .small-back-button,
-html .history-back-button,
 html .select-all-button,
 html .manual-item-button {
   color: #7b3e9f;
@@ -2880,14 +2894,14 @@ html[data-theme='dark'] .manual-item-button {
   color: #bc82ea;
 }
 
-html[data-theme='dark'] .small-back-button,
-html[data-theme='dark'] .select-all-button,
-html[data-theme='dark'] .history-back-button {
+html[data-theme='dark'] .select-all-button {
   color: #c89bea;
   background: #30233e;
 }
 
-html[data-theme='dark'] .close-button {
+html[data-theme='dark'] .close-button,
+html[data-theme='dark'] .small-back-button,
+html[data-theme='dark'] .history-back-button {
   color: #bea9cb;
   background: #2b2235;
 }
@@ -3170,7 +3184,8 @@ html .bill-footer-actions .save-button {
 .staggered-menu {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  /* Home-screen navigation sits above the hero, but below creation screens. */
+  z-index: 5;
   pointer-events: none;
 }
 
@@ -3692,5 +3707,61 @@ html .staggered-menu-toggle {
     animation: none !important;
     filter: none;
     transform: none;
+  }
+}
+
+/* On phones, creation is a real screen rather than a bottom-sheet card.
+   Keeping one viewport-sized container also makes keyboard resizing reliable. */
+@media (max-width: 699px) {
+  html .overlay {
+    top: var(--visible-offset-top);
+    bottom: auto;
+    width: 100%;
+    height: var(--visible-height);
+    padding: 0;
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  html .operation-panel,
+  html .operation-panel.step-event,
+  html .operation-panel.step-friends,
+  html .operation-panel.step-bill,
+  html .operation-panel.step-split,
+  html .operation-panel.step-result {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    margin: 0;
+    padding:
+      max(14px, env(safe-area-inset-top))
+      max(20px, env(safe-area-inset-right))
+      max(18px, env(safe-area-inset-bottom))
+      max(20px, env(safe-area-inset-left));
+    border: 0;
+    border-radius: 0;
+    overflow: hidden;
+    box-shadow: none;
+  }
+
+  html .operation-panel .panel-handle {
+    display: none;
+  }
+
+  /* iOS zooms the page when a focused form control is rendered below 16px. */
+  html .operation-panel input,
+  html .operation-panel textarea {
+    font-size: 16px;
+  }
+
+  .keyboard-open .app {
+    height: calc(var(--visible-height) + var(--visible-offset-top));
+  }
+
+  html .keyboard-open .operation-panel {
+    height: 100%;
+    max-height: none;
   }
 }

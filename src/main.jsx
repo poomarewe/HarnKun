@@ -312,30 +312,68 @@ function App() {
   useEffect(() => {
     const viewport = window.visualViewport;
     let largestHeight = viewport?.height ?? window.innerHeight;
+    let focusTimer;
 
     const syncViewport = () => {
       const visibleHeight = viewport?.height ?? window.innerHeight;
       largestHeight = Math.max(largestHeight, visibleHeight);
-      const inputIsFocused = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
-      const keyboardIsOpen = inputIsFocused && visibleHeight < largestHeight - 120;
+      const activeElement = document.activeElement;
+      const inputIsFocused = ['INPUT', 'TEXTAREA'].includes(activeElement?.tagName)
+        || activeElement?.isContentEditable;
+      // Pinch zoom also makes visualViewport.height smaller. Do not mistake that
+      // for the software keyboard or the UI will jump while the user zooms.
+      const keyboardIsOpen = inputIsFocused
+        && (viewport?.scale ?? 1) < 1.1
+        && visibleHeight < largestHeight - 120;
 
       document.documentElement.style.setProperty('--visible-height', `${Math.round(visibleHeight)}px`);
+      document.documentElement.style.setProperty(
+        '--visible-offset-top',
+        `${Math.max(0, Math.round(viewport?.offsetTop ?? 0))}px`,
+      );
       document.body.classList.toggle('keyboard-open', keyboardIsOpen);
+
+      if (keyboardIsOpen && activeElement instanceof HTMLElement) {
+        window.requestAnimationFrame(() => {
+          const rect = activeElement.getBoundingClientRect();
+          const visibleTop = viewport?.offsetTop ?? 0;
+          const visibleBottom = visibleTop + visibleHeight;
+          if (rect.top < visibleTop + 12 || rect.bottom > visibleBottom - 12) {
+            activeElement.scrollIntoView({ block: 'center', inline: 'nearest' });
+          }
+        });
+      }
+    };
+
+    const syncAfterFocusChange = () => {
+      window.clearTimeout(focusTimer);
+      syncViewport();
+      // Mobile browsers animate the keyboard after focusin/focusout, so measure
+      // once more after that animation has had time to update visualViewport.
+      focusTimer = window.setTimeout(syncViewport, 250);
+    };
+
+    const resetViewportBaseline = () => {
+      largestHeight = viewport?.height ?? window.innerHeight;
+      syncViewport();
     };
 
     syncViewport();
     viewport?.addEventListener('resize', syncViewport);
     viewport?.addEventListener('scroll', syncViewport);
     window.addEventListener('resize', syncViewport);
-    document.addEventListener('focusin', syncViewport);
-    document.addEventListener('focusout', syncViewport);
+    window.addEventListener('orientationchange', resetViewportBaseline);
+    document.addEventListener('focusin', syncAfterFocusChange);
+    document.addEventListener('focusout', syncAfterFocusChange);
 
     return () => {
+      window.clearTimeout(focusTimer);
       viewport?.removeEventListener('resize', syncViewport);
       viewport?.removeEventListener('scroll', syncViewport);
       window.removeEventListener('resize', syncViewport);
-      document.removeEventListener('focusin', syncViewport);
-      document.removeEventListener('focusout', syncViewport);
+      window.removeEventListener('orientationchange', resetViewportBaseline);
+      document.removeEventListener('focusin', syncAfterFocusChange);
+      document.removeEventListener('focusout', syncAfterFocusChange);
       document.body.classList.remove('keyboard-open');
     };
   }, []);
@@ -902,7 +940,14 @@ function App() {
 
             {historyView === 'detail' && selectedHistory && (
               <div className="history-detail">
-                <BitsButton type="button" className="history-back-button" onClick={() => setHistoryView('list')}>← All history</BitsButton>
+                <BitsButton
+                  type="button"
+                  className="history-back-button"
+                  aria-label="Back to all history"
+                  onClick={() => setHistoryView('list')}
+                >
+                  ←
+                </BitsButton>
 
                 <BitsSurface className="history-detail-summary">
                   <div><span>TOTAL</span><strong>฿{Number(selectedHistory.total).toFixed(2)}</strong></div>
@@ -943,12 +988,22 @@ function App() {
           <BitsSurface as="section" className={`operation-panel step-${step}`} aria-label="New operation" onMouseDown={(event) => event.stopPropagation()}>
             <div className="panel-handle" />
             <div className="panel-heading">
-              <div>
+              {step !== 'event' && (
+                <BitsButton
+                  type="button"
+                  className="small-back-button"
+                  aria-label="Back"
+                  disabled={isSaving || ocrStatus === 'scanning'}
+                  onClick={goBack}
+                >
+                  ←
+                </BitsButton>
+              )}
+              <div className="panel-heading-content">
                 <div className="panel-meta">
                   <span>
                     {step === 'split' ? `FOOD ${splitIndex + 1} OF ${billItems.length}` : step === 'result' ? 'ALL DONE' : `STEP ${stepNumber} OF 3`}
                   </span>
-                  {step !== 'event' && <BitsButton type="button" className="small-back-button" disabled={isSaving || ocrStatus === 'scanning'} onClick={goBack}>← Back</BitsButton>}
                 </div>
                 {step === 'event' && <h2>Name your event</h2>}
                 {step === 'friends' && (
