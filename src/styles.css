@@ -4039,12 +4039,315 @@ a:focus-visible {
   outline-color: var(--palette-lavender);
 }
 
+/* Loading the workflow stylesheet must not repaint the already-visible home. */
+html[data-theme='dark'] .app,
+html[data-theme='dark'] .silk-background {
+  background: var(--palette-ink);
+}
+
+html[data-theme='dark'] .app::before {
+  opacity: 0.46;
+  background:
+    linear-gradient(rgba(99, 89, 133, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 89, 133, 0.1) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+html .hero > .eyebrow,
+html .hero > p,
+html .hero > .hero-start-button,
+html .staggered-menu-toggle {
+  visibility: visible;
+  opacity: 1;
+  animation: none;
+}
+
 @media (max-width: 699px) {
-  html[data-theme='dark'] .app {
-    background: var(--palette-ink);
+  html[data-theme='dark'] .app::before {
+    background-size: 32px 32px;
+  }
+}
+
+/* Compact bill rows: touch devices swipe; pointer devices get one Edit action. */
+html .bill-list-heading {
+  position: relative;
+  margin-bottom: 5px;
+}
+
+html .bill-swipe-hint {
+  display: none;
+  position: absolute;
+  top: 18px;
+  left: 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.61rem;
+  font-weight: 600;
+}
+
+html .bill-column-headings {
+  display: grid;
+  flex: none;
+  grid-template-columns: minmax(0, 1fr) 68px 92px 54px;
+  gap: 8px;
+  padding: 0 12px 2px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+html .bill-column-headings span:nth-child(2) {
+  text-align: center;
+}
+
+html .bill-column-headings span:nth-child(3) {
+  text-align: right;
+}
+
+html .bill-list {
+  gap: 6px;
+}
+
+html .bill-item-shell {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  border-radius: 13px;
+}
+
+html .bill-swipe-underlay {
+  display: none;
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  color: #fff;
+  background: linear-gradient(90deg, #635985 0 50%, #393053 50% 100%);
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+html .bill-item.bill-item-compact {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: 52px;
+  grid-template-columns: minmax(0, 1fr) 68px 92px 54px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  border-radius: 13px;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms ease;
+  user-select: none;
+}
+
+html .bill-item-name {
+  min-width: 0;
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html .bill-item-quantity {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.76rem;
+  font-weight: 750;
+  text-align: center;
+}
+
+html .bill-item-price {
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.77rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html .bill-item .bill-edit-button {
+  width: 54px;
+  height: 34px;
+  border: 1px solid rgba(99, 89, 133, 0.8);
+  border-radius: 9px;
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+html .bill-item.bill-item-editor {
+  position: relative;
+  z-index: 2;
+  grid-template-columns: minmax(0, 1fr) 64px 92px auto;
+  align-items: end;
+  gap: 8px;
+  padding: 10px;
+  animation: none;
+}
+
+html .bill-edit-actions {
+  display: flex;
+  gap: 5px;
+}
+
+html .bill-item .bill-edit-actions button {
+  width: auto;
+  min-width: 48px;
+  height: 42px;
+  padding: 0 9px;
+  font-size: 0.63rem;
+  font-weight: 800;
+}
+
+html[data-theme='dark'] .bill-item .bill-delete-button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #18122b;
+}
+
+html[data-theme='dark'] .bill-item .bill-done-button {
+  border: 1px solid #635985;
+  background: #635985;
+}
+
+@media (hover: none), (pointer: coarse) {
+  html .bill-list-heading {
+    margin-bottom: 20px;
   }
 
-  html[data-theme='dark'] .silk-background {
-    background: var(--palette-ink);
+  html .bill-list-heading.is-editing {
+    margin-bottom: 7px;
+  }
+
+  html .bill-swipe-hint {
+    display: block;
+  }
+
+  html .bill-column-headings,
+  html .bill-item.bill-item-compact {
+    grid-template-columns: minmax(0, 1fr) 62px 84px;
+  }
+
+  html .bill-column-headings span:last-child,
+  html .bill-item .bill-edit-button {
+    display: none;
+  }
+
+  html .bill-swipe-underlay {
+    display: flex;
+  }
+
+  html .bill-item.bill-item-compact {
+    min-height: 48px;
+    touch-action: pan-y;
+  }
+
+  html .bill-item.bill-item-compact.swiping-edit,
+  html .bill-item.bill-item-compact.swiping-remove {
+    transition: none;
+  }
+
+  html .bill-item.bill-item-editor {
+    grid-template-columns: 74px minmax(0, 1fr);
+  }
+
+  html .bill-item-editor .bill-field-name,
+  html .bill-item-editor .bill-edit-actions {
+    grid-column: 1 / -1;
+  }
+
+  html .bill-item-editor .bill-field-quantity {
+    grid-column: 1;
+  }
+
+  html .bill-item-editor .bill-field-amount {
+    grid-column: 2;
+  }
+
+  html .bill-edit-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  html .bill-item .bill-edit-actions button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 370px) {
+  html .bill-column-headings,
+  html .bill-item.bill-item-compact {
+    grid-template-columns: minmax(0, 1fr) 54px 76px;
+    gap: 5px;
+  }
+
+  html .bill-item.bill-item-compact {
+    padding-inline: 10px;
+  }
+}
+
+/* Keep the bill total and primary action attached to the visible bottom edge. */
+@media (max-width: 699px) {
+  html .step-bill .bill-step {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  html .step-bill .bill-list {
+    min-height: 54px;
+    max-height: min(44dvh, 390px);
+    flex: 0 1 auto;
+  }
+
+  html .step-bill .bill-footer-actions {
+    position: relative;
+    z-index: 5;
+    flex: none;
+    margin-top: auto;
+    padding-top: 8px;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  html .step-bill .bill-total {
+    margin-top: 0;
+    box-shadow: none;
+  }
+
+  html .step-bill .bill-footer-actions .manual-item-button {
+    margin: 0 0 8px;
+    padding: 6px 4px;
+  }
+
+  html .step-bill .bill-footer-actions .save-button {
+    width: 100%;
+    margin-top: 8px;
+    box-shadow: none;
+  }
+
+  html .keyboard-open .step-bill .panel-heading {
+    margin-bottom: 8px;
+  }
+
+  html .keyboard-open .step-bill .bill-list {
+    min-height: 48px;
+    max-height: calc(var(--visible-height) - 150px);
+    scroll-behavior: auto;
+  }
+
+  html .keyboard-open .step-bill .bill-footer-actions {
+    display: none;
+  }
+
+  /* Safari zooms focused controls whose computed text size is below 16px.
+     Keep this final and specific so compact field rules cannot override it. */
+  html body .operation-panel input:not([type='file']),
+  html body .operation-panel textarea,
+  html body .operation-panel select {
+    font-size: 16px !important;
   }
 }

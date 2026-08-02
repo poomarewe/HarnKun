@@ -24,6 +24,7 @@ body,
   margin: 0;
   overflow: hidden;
   background: var(--palette-ink);
+  touch-action: pan-x pan-y;
 }
 
 body {

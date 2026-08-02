@@ -14,6 +14,17 @@ const loadAppStyles = () => {
   return appStylesPromise;
 };
 
+const createAutomaticEventName = () => {
+  const dateTime = new Intl.DateTimeFormat(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date());
+  return `Bill · ${dateTime}`;
+};
+
 const THAI_DIGITS = { '๐': '0', '๑': '1', '๒': '2', '๓': '3', '๔': '4', '๕': '5', '๖': '6', '๗': '7', '๘': '8', '๙': '9' };
 const SUMMARY_WORDS = /(?:ยอดรวม|รวมมูลค่า|รวมทั้งสิ้น|ยอดสุทธิ|สุทธิ|จำนวน\s*\d*\s*ชิ้น|subtotal|total|vat|ภาษี|service|ค่าบริการ|ส่วนลด|discount|เงินสด|เงินทอน|change|ชำระ)/i;
 const META_WORDS = /(?:ใบเสร็จ|receipt|invoice|tax\s*id|เลขประจำตัว|โทร|tel|โต๊ะ|table|คิว|queue|วันที่|date|เวลา|time|พนักงาน|cashier|pos\s*#|สาขา|บริษัท|line\s*[:@]|powered)/i;
@@ -288,17 +299,19 @@ async function clearHistoryRecords() {
 function App() {
   const [silkReady, setSilkReady] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [hasActiveDraft, setHasActiveDraft] = useState(false);
   const [historyView, setHistoryView] = useState(null);
   const [historyRecords, setHistoryRecords] = useState([]);
   const [selectedHistory, setSelectedHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [activeHistoryId, setActiveHistoryId] = useState(null);
-  const [step, setStep] = useState('event');
+  const [step, setStep] = useState('friends');
   const [eventName, setEventName] = useState('');
   const [friendName, setFriendName] = useState('');
   const [friends, setFriends] = useState([]);
   const [billImageUrl, setBillImageUrl] = useState('');
   const [billItems, setBillItems] = useState([]);
+  const [editingBillIndex, setEditingBillIndex] = useState(null);
   const [ocrStatus, setOcrStatus] = useState('idle');
   const [ocrProgress, setOcrProgress] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
@@ -311,6 +324,9 @@ function App() {
   const inputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const uploadInputRef = useRef(null);
+  const billSwipeRef = useRef(null);
+  const billListRef = useRef(null);
+  const billEditorRef = useRef(null);
 
   const total = useMemo(
     () => billItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
@@ -423,8 +439,58 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (isCreating && (step === 'event' || step === 'friends')) inputRef.current?.focus();
+    const preventGestureZoom = (event) => event.preventDefault();
+    const preventMultiTouchZoom = (event) => {
+      if (event.touches?.length > 1) event.preventDefault();
+    };
+    const preventWheelZoom = (event) => {
+      if (event.ctrlKey || event.metaKey) event.preventDefault();
+    };
+    const preventKeyboardZoom = (event) => {
+      if ((event.ctrlKey || event.metaKey) && ['+', '-', '=', '0'].includes(event.key)) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener('gesturestart', preventGestureZoom, { passive: false });
+    document.addEventListener('gesturechange', preventGestureZoom, { passive: false });
+    document.addEventListener('gestureend', preventGestureZoom, { passive: false });
+    document.addEventListener('touchmove', preventMultiTouchZoom, { passive: false });
+    document.addEventListener('wheel', preventWheelZoom, { passive: false });
+    document.addEventListener('keydown', preventKeyboardZoom);
+
+    return () => {
+      document.removeEventListener('gesturestart', preventGestureZoom);
+      document.removeEventListener('gesturechange', preventGestureZoom);
+      document.removeEventListener('gestureend', preventGestureZoom);
+      document.removeEventListener('touchmove', preventMultiTouchZoom);
+      document.removeEventListener('wheel', preventWheelZoom);
+      document.removeEventListener('keydown', preventKeyboardZoom);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isCreating && step === 'friends') inputRef.current?.focus();
   }, [isCreating, step]);
+
+  useEffect(() => {
+    if (editingBillIndex === null) return undefined;
+
+    const scrollEditorToBottom = () => {
+      const list = billListRef.current;
+      if (!list || !billEditorRef.current) return;
+      list.scrollTop = list.scrollHeight;
+    };
+
+    const frame = window.requestAnimationFrame(scrollEditorToBottom);
+    const timers = [120, 320, 600].map((delay) => window.setTimeout(scrollEditorToBottom, delay));
+    window.visualViewport?.addEventListener('resize', scrollEditorToBottom);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      timers.forEach((timer) => window.clearTimeout(timer));
+      window.visualViewport?.removeEventListener('resize', scrollEditorToBottom);
+    };
+  }, [editingBillIndex]);
 
   useEffect(() => {
     if (cooldownRemaining <= 0) return undefined;
@@ -442,6 +508,7 @@ function App() {
     if (billImageUrl) URL.revokeObjectURL(billImageUrl);
     setBillImageUrl('');
     setBillItems([]);
+    setEditingBillIndex(null);
     setRawOcrText('');
     setOcrStatus('idle');
     setOcrProgress(0);
@@ -452,15 +519,20 @@ function App() {
     setHistoryView(null);
     setSelectedHistory(null);
     setActiveHistoryId(null);
-    setStep('event');
-    setEventName('');
-    setFriendName('');
-    setFriends([]);
-    setAllocations([]);
-    setSplitIndex(0);
-    setSettlements([]);
-    resetBill();
-    setError('');
+
+    if (!hasActiveDraft) {
+      setStep('friends');
+      setEventName(createAutomaticEventName());
+      setFriendName('');
+      setFriends([]);
+      setAllocations([]);
+      setSplitIndex(0);
+      setSettlements([]);
+      resetBill();
+      setError('');
+      setHasActiveDraft(true);
+    }
+
     setIsCreating(true);
   };
 
@@ -507,12 +579,9 @@ function App() {
     if (!isSaving && ocrStatus !== 'scanning') setIsCreating(false);
   };
 
-  const continueToFriends = (event) => {
-    event.preventDefault();
-    if (!eventName.trim()) return;
-    setEventName(eventName.trim());
-    setStep('friends');
-    setError('');
+  const finishOperation = () => {
+    setIsCreating(false);
+    setHasActiveDraft(false);
   };
 
   const addFriend = (event) => {
@@ -569,6 +638,7 @@ function App() {
     if (billImageUrl) URL.revokeObjectURL(billImageUrl);
     setBillImageUrl(URL.createObjectURL(uploadFile));
     setBillItems([]);
+    setEditingBillIndex(null);
     setRawOcrText('');
     setOcrStatus('scanning');
     setOcrProgress(0.08);
@@ -604,6 +674,7 @@ function App() {
       setOcrProgress(1);
       setRawOcrText(text);
       setBillItems(detectedItems);
+      setEditingBillIndex(null);
       setOcrStatus('review');
       if (detectedItems.length === 0) {
         setError('No food rows were detected. Add them manually or try a clearer photo.');
@@ -631,12 +702,61 @@ function App() {
 
   const removeBillItem = (indexToRemove) => {
     setBillItems((currentItems) => currentItems.filter((_, index) => index !== indexToRemove));
+    setEditingBillIndex((currentIndex) => {
+      if (currentIndex === indexToRemove) return null;
+      return currentIndex > indexToRemove ? currentIndex - 1 : currentIndex;
+    });
   };
 
   const addManualItem = () => {
+    setEditingBillIndex(billItems.length);
     setBillItems((currentItems) => [...currentItems, { name: '', quantity: 1, amount: 0 }]);
     setOcrStatus('review');
     setError('');
+  };
+
+  const beginBillSwipe = (event, index) => {
+    if (event.pointerType === 'mouse' || editingBillIndex === index) return;
+    billSwipeRef.current = {
+      index,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      element: event.currentTarget,
+      dragging: false,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const moveBillSwipe = (event) => {
+    const swipe = billSwipeRef.current;
+    if (!swipe || swipe.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - swipe.startX;
+    const deltaY = event.clientY - swipe.startY;
+    if (!swipe.dragging && Math.abs(deltaX) < 8) return;
+    if (!swipe.dragging && Math.abs(deltaY) > Math.abs(deltaX)) return;
+
+    swipe.dragging = true;
+    const offset = Math.max(-88, Math.min(88, deltaX));
+    swipe.element.style.transform = `translate3d(${offset}px, 0, 0)`;
+    swipe.element.classList.toggle('swiping-edit', offset > 0);
+    swipe.element.classList.toggle('swiping-remove', offset < 0);
+  };
+
+  const finishBillSwipe = (event, shouldAct = true) => {
+    const swipe = billSwipeRef.current;
+    if (!swipe || swipe.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - swipe.startX;
+    if (swipe.element.hasPointerCapture?.(event.pointerId)) {
+      swipe.element.releasePointerCapture(event.pointerId);
+    }
+    swipe.element.style.removeProperty('transform');
+    swipe.element.classList.remove('swiping-edit', 'swiping-remove');
+    billSwipeRef.current = null;
+
+    if (!shouldAct || !swipe.dragging) return;
+    if (deltaX <= -68) removeBillItem(swipe.index);
+    if (deltaX >= 68) setEditingBillIndex(swipe.index);
   };
 
   const startSplitting = () => {
@@ -647,6 +767,7 @@ function App() {
     }
 
     setBillItems(cleanItems);
+    setEditingBillIndex(null);
     setAllocations(cleanItems.map(() => []));
     setSplitIndex(0);
     setSettlements([]);
@@ -727,6 +848,9 @@ function App() {
         console.error('Could not save local history:', historyError);
       }
       setSettlements(calculatedSettlements);
+      // The completed operation is already stored in History. Keep its summary
+      // visible, but make the next Start action open a clean draft immediately.
+      setHasActiveDraft(false);
       setStep('result');
     } catch (requestError) {
       setError(requestError.message);
@@ -759,7 +883,7 @@ function App() {
     setError('');
 
     if (step === 'friends') {
-      setStep('event');
+      setIsCreating(false);
     } else if (step === 'bill') {
       if (billImageUrl || ocrStatus === 'review' || billItems.length > 0) {
         resetBill();
@@ -961,7 +1085,7 @@ function App() {
     }
   };
 
-  const stepNumber = step === 'event' ? 1 : step === 'friends' ? 2 : 3;
+  const stepNumber = step === 'friends' ? 1 : 2;
 
   return (
     <ClickSpark as="main" className="app">
@@ -979,13 +1103,11 @@ function App() {
         <p>Make every bill effortless.</p>
         <SpecularButton
           className="hero-start-button"
-          aria-label="Start splitting a bill"
+          aria-label={hasActiveDraft ? 'Resume splitting the current bill' : 'Start splitting a bill'}
           aria-expanded={isCreating}
-          onPointerEnter={() => void loadAppStyles()}
-          onFocus={() => void loadAppStyles()}
           onClick={openPanel}
         >
-          Start splitting <span aria-hidden="true">→</span>
+          {hasActiveDraft ? 'Resume splitting' : 'Start splitting'} <span aria-hidden="true">→</span>
         </SpecularButton>
       </section>
 
@@ -1083,7 +1205,7 @@ function App() {
           <BitsSurface as="section" className={`operation-panel step-${step}`} aria-label="New operation" onMouseDown={(event) => event.stopPropagation()}>
             <div className="panel-handle" />
             <div className="panel-heading">
-              {step !== 'event' && (
+              {step !== 'friends' && (
                 <BitsButton
                   type="button"
                   className="small-back-button"
@@ -1097,10 +1219,9 @@ function App() {
               <div className="panel-heading-content">
                 <div className="panel-meta">
                   <span>
-                    {step === 'split' ? `FOOD ${splitIndex + 1} OF ${billItems.length}` : step === 'result' ? 'ALL DONE' : `STEP ${stepNumber} OF 3`}
+                    {step === 'split' ? `FOOD ${splitIndex + 1} OF ${billItems.length}` : step === 'result' ? 'ALL DONE' : `STEP ${stepNumber} OF 2`}
                   </span>
                 </div>
-                {step === 'event' && <h2>Name your event</h2>}
                 {step === 'friends' && (
                   <div className="friends-title">
                     <h2>Add your friends to <strong>{eventName}</strong></h2>
@@ -1113,20 +1234,12 @@ function App() {
               <BitsButton type="button" className="close-button" onClick={closePanel} aria-label="Close">×</BitsButton>
             </div>
 
-            {step === 'event' && (
-              <form onSubmit={continueToFriends}>
-                <label htmlFor="event-name">Event name</label>
-                <input ref={inputRef} id="event-name" value={eventName} onChange={(event) => setEventName(event.target.value)} type="text" placeholder="e.g. Beach trip" autoComplete="off" enterKeyHint="next" maxLength="80" required />
-                <BitsButton className="save-button" type="submit">OK, add friends</BitsButton>
-              </form>
-            )}
-
             {step === 'friends' && (
               <div className="friends-step">
-                <form className="friend-form" onSubmit={addFriend}>
+                <form className="friend-form" autoComplete="off" data-form-type="other" onSubmit={addFriend}>
                   <label htmlFor="friend-name">Friend's name</label>
                   <div className="friend-input-row">
-                    <input ref={inputRef} id="friend-name" value={friendName} onChange={(event) => setFriendName(event.target.value)} type="text" placeholder="Type a name" autoComplete="off" enterKeyHint="done" maxLength="60" disabled={friends.length >= 100} />
+                    <input ref={inputRef} id="friend-name" name="friend-name-entry" value={friendName} onChange={(event) => setFriendName(event.target.value)} type="text" placeholder="Type a name" autoComplete="off" data-form-type="other" data-lpignore="true" enterKeyHint="done" maxLength="60" disabled={friends.length >= 100} />
                     <BitsButton type="submit" className="add-button" disabled={!friendName.trim() || friends.length >= 100}>Add</BitsButton>
                   </div>
                 </form>
@@ -1193,28 +1306,62 @@ function App() {
 
                     {(ocrStatus === 'review' || billItems.length > 0) && (
                       <>
-                        <div className="bill-list-heading"><span>Food detected</span><strong>{billItems.length} items</strong></div>
-                        <div className="bill-list">
-                          {billItems.map((item, index) => (
-                            <BitsSurface className="bill-item" key={`bill-item-${index}`}>
-                              <label className="bill-field bill-field-name">
-                                <span>Food</span>
-                                <input aria-label={`Food ${index + 1}`} value={item.name} onChange={(event) => updateBillItem(index, 'name', event.target.value)} placeholder="Food name" />
-                              </label>
-                              <label className="bill-field bill-field-quantity">
-                                <span>Qty</span>
-                                <input aria-label={`Quantity ${index + 1}`} type="number" min="1" inputMode="numeric" value={item.quantity} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'quantity', event.target.value)} />
-                              </label>
-                              <label className="bill-field bill-field-amount">
-                                <span>Price</span>
-                                <input aria-label={`Amount ${index + 1}`} type="number" min="0" step="0.01" inputMode="decimal" value={item.amount} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'amount', event.target.value)} />
-                              </label>
-                              <BitsButton className="bill-remove-button" type="button" onClick={() => removeBillItem(index)} aria-label={`Remove ${item.name || 'item'}`}>×</BitsButton>
-                            </BitsSurface>
-                          ))}
+                        <div className={`bill-list-heading${editingBillIndex !== null ? ' is-editing' : ''}`}>
+                          <span>Food detected</span>
+                          <strong>{billItems.length} items</strong>
+                          {editingBillIndex === null && <small className="bill-swipe-hint">Swipe right to edit · left to remove</small>}
                         </div>
-                        <BitsButton type="button" className="manual-item-button" onClick={addManualItem}>+ Add food manually</BitsButton>
-                        <BitsSurface className="bill-total"><span>SUM</span><strong>฿{total.toFixed(2)}</strong></BitsSurface>
+                        {editingBillIndex === null && (
+                          <div className="bill-column-headings" aria-hidden="true">
+                            <span>Name</span><span>Quantity</span><span>Price</span><span />
+                          </div>
+                        )}
+                        <div className="bill-list" ref={billListRef}>
+                          {billItems.map((item, index) => {
+                            const isEditing = editingBillIndex === index;
+                            return (
+                              <div className={`bill-item-shell${isEditing ? ' is-editing' : ''}`} key={`bill-item-${index}`}>
+                                <div className="bill-swipe-underlay" aria-hidden="true">
+                                  <span>Edit</span><span>Remove</span>
+                                </div>
+                                {isEditing ? (
+                                  <BitsSurface className="bill-item bill-item-editor" ref={billEditorRef}>
+                                    <label className="bill-field bill-field-name">
+                                      <span>Name</span>
+                                      <input autoFocus aria-label={`Food ${index + 1}`} name={`food-name-${index}`} value={item.name} onChange={(event) => updateBillItem(index, 'name', event.target.value)} placeholder="Food name" autoComplete="off" data-form-type="other" data-lpignore="true" />
+                                    </label>
+                                    <label className="bill-field bill-field-quantity">
+                                      <span>Quantity</span>
+                                      <input aria-label={`Quantity ${index + 1}`} name={`food-quantity-${index}`} type="number" min="1" inputMode="numeric" value={item.quantity} autoComplete="off" data-form-type="other" data-lpignore="true" onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'quantity', event.target.value)} />
+                                    </label>
+                                    <label className="bill-field bill-field-amount">
+                                      <span>Price</span>
+                                      <input aria-label={`Amount ${index + 1}`} name={`food-price-${index}`} type="number" min="0" step="0.01" inputMode="decimal" value={item.amount} autoComplete="off" data-form-type="other" data-lpignore="true" onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'amount', event.target.value)} />
+                                    </label>
+                                    <div className="bill-edit-actions">
+                                      <BitsButton className="bill-delete-button" type="button" onClick={() => removeBillItem(index)}>Delete</BitsButton>
+                                      <BitsButton className="bill-done-button" type="button" onClick={() => setEditingBillIndex(null)}>Done</BitsButton>
+                                    </div>
+                                  </BitsSurface>
+                                ) : (
+                                  <BitsSurface
+                                    as="article"
+                                    className="bill-item bill-item-compact"
+                                    onPointerDown={(event) => beginBillSwipe(event, index)}
+                                    onPointerMove={moveBillSwipe}
+                                    onPointerUp={finishBillSwipe}
+                                    onPointerCancel={(event) => finishBillSwipe(event, false)}
+                                  >
+                                    <strong className="bill-item-name">{item.name || 'Unnamed food'}</strong>
+                                    <span className="bill-item-quantity">{Number(item.quantity) || 1}</span>
+                                    <strong className="bill-item-price">฿{(Number(item.amount) || 0).toFixed(2)}</strong>
+                                    <BitsButton className="bill-edit-button" type="button" onClick={() => setEditingBillIndex(index)} aria-label={`Edit ${item.name || 'item'}`}>Edit</BitsButton>
+                                  </BitsSurface>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </>
                     )}
 
@@ -1231,7 +1378,13 @@ function App() {
                 {error && <p className="form-error" role="alert">{error}</p>}
                 {ocrStatus !== 'scanning' && (
                   <div className="bill-footer-actions">
-                    {(ocrStatus === 'review' || billItems.length > 0) && <BitsButton className="save-button" type="button" disabled={!billItems.some((item) => item.name.trim())} onClick={startSplitting}>Confirm & split</BitsButton>}
+                    {(ocrStatus === 'review' || billItems.length > 0) && (
+                      <>
+                        <BitsButton type="button" className="manual-item-button" onClick={addManualItem}>+ Add food manually</BitsButton>
+                        <BitsSurface className="bill-total"><span>SUM</span><strong>฿{total.toFixed(2)}</strong></BitsSurface>
+                        <BitsButton className="save-button" type="button" disabled={!billItems.some((item) => item.name.trim())} onClick={startSplitting}>Confirm & split</BitsButton>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -1301,7 +1454,7 @@ function App() {
 
                 {error && <p className="form-error" role="alert">{error}</p>}
                 <BitsButton type="button" className="download-button" onClick={() => downloadSummary()}>Download as picture</BitsButton>
-                <BitsButton type="button" className="done-button" onClick={() => setIsCreating(false)}>Done</BitsButton>
+                <BitsButton type="button" className="done-button" onClick={finishOperation}>Done</BitsButton>
               </div>
             )}
           </BitsSurface>
