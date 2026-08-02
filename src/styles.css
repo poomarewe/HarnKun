@@ -4038,3 +4038,13 @@ input:focus-visible,
 a:focus-visible {
   outline-color: var(--palette-lavender);
 }
+
+@media (max-width: 699px) {
+  html[data-theme='dark'] .app {
+    background: var(--palette-ink);
+  }
+
+  html[data-theme='dark'] .silk-background {
+    background: var(--palette-ink);
+  }
+}

@@ -335,11 +335,11 @@ function App() {
     const scheduleSilk = () => {
       loadTimer = window.setTimeout(() => {
         if ('requestIdleCallback' in window) {
-          idleHandle = window.requestIdleCallback(showSilk, { timeout: 2000 });
+          idleHandle = window.requestIdleCallback(showSilk, { timeout: 800 });
         } else {
-          fallbackTimer = window.setTimeout(showSilk, 500);
+          fallbackTimer = window.setTimeout(showSilk, 150);
         }
-      }, 2500);
+      }, 250);
     };
 
     if (document.readyState === 'complete') scheduleSilk();
