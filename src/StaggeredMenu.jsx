@@ -17,14 +17,14 @@ export default function StaggeredMenu({
     toggleRef.current?.focus();
   };
 
-  const toggleMenu = () => {
+  const toggleMenu = async () => {
     if (isOpen) {
       closeMenu();
       return;
     }
 
+    await onOpen?.();
     setIsOpen(true);
-    onOpen?.();
   };
 
   useEffect(() => {

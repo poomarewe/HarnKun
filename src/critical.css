@@ -1,0 +1,312 @@
+:root {
+  --visible-height: 100dvh;
+  --visible-offset-top: 0px;
+  --palette-lavender: #635985;
+  --palette-indigo: #443c68;
+  --palette-plum: #393053;
+  --palette-ink: #18122b;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  font-family: 'Manrope', system-ui, sans-serif;
+  color: #fff;
+  background: var(--palette-ink);
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--palette-ink);
+}
+
+body {
+  overscroll-behavior: none;
+}
+
+button {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.app {
+  position: relative;
+  width: 100%;
+  height: var(--visible-height);
+  overflow: hidden;
+  isolation: isolate;
+  -webkit-user-select: none;
+  user-select: none;
+  background: var(--palette-ink);
+}
+
+.app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.46;
+  background:
+    linear-gradient(rgba(99, 89, 133, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 89, 133, 0.1) 1px, transparent 1px);
+  background-size: 42px 42px;
+  pointer-events: none;
+}
+
+.silk-background {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  background:
+    linear-gradient(112deg, transparent 7%, rgba(99, 89, 133, 0.32) 18%, transparent 31%),
+    linear-gradient(112deg, transparent 45%, rgba(68, 60, 104, 0.5) 58%, transparent 72%),
+    repeating-linear-gradient(112deg, rgba(24, 18, 43, 0.24) 0 18px, rgba(99, 89, 133, 0.12) 22px 42px),
+    linear-gradient(145deg, var(--palette-ink), var(--palette-plum) 52%, var(--palette-ink));
+  background-size: 180% 100%, 170% 100%, 100% 100%, 100% 100%;
+  pointer-events: none;
+}
+
+.silk-background canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  animation: critical-silk-reveal 520ms ease-out both;
+}
+
+@keyframes critical-silk-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.hero {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  width: 100%;
+  padding: clamp(24px, 6vw, 80px);
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 16px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.42em;
+  text-shadow: 0 2px 14px rgba(24, 18, 43, 0.48);
+}
+
+.hero h1 {
+  position: relative;
+  width: min(84vw, 650px);
+  height: 1.12em;
+  margin: 0 auto;
+  overflow: visible;
+  color: #635985;
+  font-family: 'Noto Sans Thai', sans-serif;
+  font-size: clamp(4rem, 12vw, 8.5rem);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.pressure-shine-title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #635985;
+  white-space: nowrap;
+  filter: drop-shadow(0 14px 22px rgba(24, 18, 43, 0.36));
+}
+
+.pressure-shine-character {
+  display: inline-block;
+  color: #635985;
+  font-weight: 700;
+  transform: scaleX(1);
+  transform-origin: center;
+}
+
+.pressure-shine-space {
+  display: inline-block;
+  width: 0.28em;
+  flex: 0 0 0.28em;
+}
+
+.hero p {
+  margin: 22px 0 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(0.9rem, 1.8vw, 1.08rem);
+  font-weight: 600;
+  letter-spacing: 0.015em;
+  text-shadow: 0 2px 16px rgba(24, 18, 43, 0.48);
+}
+
+.specular-button {
+  --sb-radius: 18px;
+  --sb-tint: #635985;
+  --sb-text-color: #fff;
+  position: relative;
+  display: inline-flex;
+  min-width: 222px;
+  min-height: 56px;
+  margin: 28px 0 0;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  padding: 18px 40px;
+  border: 1px solid rgba(99, 89, 133, 0.9);
+  border-radius: var(--sb-radius);
+  outline: none;
+  color: var(--sb-text-color);
+  background: linear-gradient(135deg, var(--palette-lavender), var(--palette-indigo));
+  box-shadow: 0 14px 34px rgba(24, 18, 43, 0.42);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.specular-button__effect {
+  position: absolute;
+  inset: -20px;
+  z-index: 1;
+  display: block;
+  width: calc(100% + 40px);
+  height: calc(100% + 40px);
+  pointer-events: none;
+}
+
+.specular-button__label {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.specular-button:focus-visible,
+.staggered-menu-toggle:focus-visible {
+  outline: 3px solid var(--palette-lavender);
+  outline-offset: 4px;
+}
+
+.click-spark-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}
+
+.staggered-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.staggered-menu-toggle {
+  position: absolute;
+  top: max(22px, env(safe-area-inset-top));
+  right: max(22px, env(safe-area-inset-right));
+  z-index: 4;
+  display: flex;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.staggered-menu-toggle i {
+  position: relative;
+  display: block;
+  width: 24px;
+  height: 14px;
+}
+
+.staggered-menu-toggle b {
+  position: absolute;
+  right: 0;
+  display: block;
+  width: 24px;
+  height: 2px;
+  border-radius: 99px;
+  background: currentColor;
+}
+
+.staggered-menu-toggle b:first-child { top: 2px; }
+.staggered-menu-toggle b:last-child { top: 9px; }
+
+.staggered-menu-backdrop,
+.staggered-menu-layer,
+.staggered-menu-panel {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.staggered-menu-layer,
+.staggered-menu-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(440px, 100%);
+  height: 100%;
+  transform: translate3d(105%, 0, 0);
+}
+
+@media (max-width: 699px) {
+  .app::before {
+    background-size: 32px 32px;
+  }
+
+  .hero {
+    top: 43%;
+    padding-inline: 22px;
+  }
+
+  .hero h1 {
+    width: min(88vw, 650px);
+  }
+
+  .specular-button {
+    min-width: 210px;
+    min-height: 54px;
+    margin-top: 24px;
+  }
+
+  .staggered-menu-toggle {
+    top: max(16px, env(safe-area-inset-top));
+    right: max(16px, env(safe-area-inset-right));
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .silk-background canvas {
+    animation: none;
+  }
+}

@@ -4,9 +4,15 @@ import HeroTitle from './HeroTitle';
 import { BitsButton, BitsSurface, ClickSpark } from './ReactBitsUI';
 import SpecularButton from './SpecularButton';
 import StaggeredMenu from './StaggeredMenu';
-import './styles.css';
+import './critical.css';
 
 const Silk = lazy(() => import('./Silk'));
+let appStylesPromise;
+
+const loadAppStyles = () => {
+  if (!appStylesPromise) appStylesPromise = import('./styles.css');
+  return appStylesPromise;
+};
 
 const THAI_DIGITS = { '๐': '0', '๑': '1', '๒': '2', '๓': '3', '๔': '4', '๕': '5', '๖': '6', '๗': '7', '๘': '8', '๙': '9' };
 const SUMMARY_WORDS = /(?:ยอดรวม|รวมมูลค่า|รวมทั้งสิ้น|ยอดสุทธิ|สุทธิ|จำนวน\s*\d*\s*ชิ้น|subtotal|total|vat|ภาษี|service|ค่าบริการ|ส่วนลด|discount|เงินสด|เงินทอน|change|ชำระ)/i;
@@ -314,14 +320,26 @@ function App() {
   useEffect(() => {
     let idleHandle;
     let fallbackTimer;
+    let loadTimer;
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const coarsePointer = window.matchMedia('(pointer: coarse)');
+
+    // Phones and tablets use the lightweight CSS silk treatment. It preserves
+    // the look without starting a continuous WebGL render loop on mobile CPUs.
+    if (reducedMotion.matches || coarsePointer.matches || window.innerWidth <= 699) {
+      return undefined;
+    }
 
     const showSilk = () => setSilkReady(true);
     const scheduleSilk = () => {
-      if ('requestIdleCallback' in window) {
-        idleHandle = window.requestIdleCallback(showSilk, { timeout: 1600 });
-      } else {
-        fallbackTimer = window.setTimeout(showSilk, 500);
-      }
+      loadTimer = window.setTimeout(() => {
+        if ('requestIdleCallback' in window) {
+          idleHandle = window.requestIdleCallback(showSilk, { timeout: 2000 });
+        } else {
+          fallbackTimer = window.setTimeout(showSilk, 500);
+        }
+      }, 2500);
     };
 
     if (document.readyState === 'complete') scheduleSilk();
@@ -330,6 +348,7 @@ function App() {
     return () => {
       window.removeEventListener('load', scheduleSilk);
       if (idleHandle !== undefined) window.cancelIdleCallback?.(idleHandle);
+      window.clearTimeout(loadTimer);
       window.clearTimeout(fallbackTimer);
     };
   }, []);
@@ -428,7 +447,8 @@ function App() {
     setOcrProgress(0);
   };
 
-  const openPanel = () => {
+  const openPanel = async () => {
+    await loadAppStyles();
     setHistoryView(null);
     setSelectedHistory(null);
     setActiveHistoryId(null);
@@ -445,6 +465,7 @@ function App() {
   };
 
   const openHistory = async () => {
+    await loadAppStyles();
     setIsCreating(false);
     setSelectedHistory(null);
     setHistoryView('list');
@@ -960,6 +981,8 @@ function App() {
           className="hero-start-button"
           aria-label="Start splitting a bill"
           aria-expanded={isCreating}
+          onPointerEnter={() => void loadAppStyles()}
+          onFocus={() => void loadAppStyles()}
           onClick={openPanel}
         >
           Start splitting <span aria-hidden="true">→</span>

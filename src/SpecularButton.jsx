@@ -126,6 +126,12 @@ export default function SpecularButton({
   };
 
   useEffect(() => {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const coarsePointer = window.matchMedia('(pointer: coarse)');
+    if (reducedMotion.matches || coarsePointer.matches || window.innerWidth <= 699) {
+      return undefined;
+    }
+
     let disposeRenderer = () => {};
     let idleHandle = 0;
     let delayHandle = 0;
