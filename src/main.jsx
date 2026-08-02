@@ -738,104 +738,148 @@ function App() {
       const summaryAllocations = savedRecord?.allocations ?? allocations;
       const summarySettlements = savedRecord?.settlements ?? settlements;
       const summaryTotal = Number(savedRecord?.total ?? total);
+
+      // Wait for the web font before measuring. Safari otherwise occasionally
+      // measures with its fallback font and draws with the loaded font.
+      if (document.fonts?.ready) await document.fonts.ready;
+
       const width = 1080;
       const measuringCanvas = document.createElement('canvas');
       const measuringContext = measuringCanvas.getContext('2d');
       measuringContext.font = '600 27px "Noto Sans Thai", sans-serif';
 
-    const makePayerLines = (selectedFriends) => {
-      const prefix = `หาร ${selectedFriends.length} คน: `;
-      const lines = [];
-      let currentLine = prefix;
+      const makePayerLines = (selectedFriends) => {
+        const prefix = `หาร ${selectedFriends.length} คน: `;
+        const lines = [];
+        let currentLine = prefix;
 
-      selectedFriends.forEach((friend) => {
-        const candidate = currentLine === prefix ? `${currentLine}${friend}` : `${currentLine}, ${friend}`;
-        if (measuringContext.measureText(candidate).width > 850 && currentLine !== prefix) {
-          lines.push(currentLine);
-          currentLine = friend;
+        selectedFriends.forEach((friend) => {
+          const candidate = currentLine === prefix ? `${currentLine}${friend}` : `${currentLine}, ${friend}`;
+          if (measuringContext.measureText(candidate).width > 790 && currentLine !== prefix) {
+            lines.push(currentLine);
+            currentLine = friend;
+          } else {
+            currentLine = candidate;
+          }
+        });
+        lines.push(currentLine);
+        return lines;
+      };
+
+      const foodLayouts = summaryBillItems.map((item, index) => {
+        const payerLines = makePayerLines(summaryAllocations[index] || []);
+        return { item, payerLines, height: 112 + Math.max(0, payerLines.length - 1) * 34 };
+      });
+      const foodSectionHeight = foodLayouts.reduce((sum, layout) => sum + layout.height + 14, 0);
+      const settlementSectionHeight = summarySettlements.length * 94;
+      const height = Math.max(1200, 550 + foodSectionHeight + settlementSectionHeight);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+
+      const fillRoundedRect = (x, y, rectWidth, rectHeight, radius, fillStyle) => {
+        context.fillStyle = fillStyle;
+        context.beginPath();
+        if (typeof context.roundRect === 'function') {
+          context.roundRect(x, y, rectWidth, rectHeight, radius);
         } else {
-          currentLine = candidate;
+          context.moveTo(x + radius, y);
+          context.arcTo(x + rectWidth, y, x + rectWidth, y + rectHeight, radius);
+          context.arcTo(x + rectWidth, y + rectHeight, x, y + rectHeight, radius);
+          context.arcTo(x, y + rectHeight, x, y, radius);
+          context.arcTo(x, y, x + rectWidth, y, radius);
+          context.closePath();
         }
+        context.fill();
+      };
+
+      // Avoid canvas textAlign="right": WebKit can position Thai/currency text
+      // incorrectly in exported canvases. Measuring the X coordinate is stable
+      // on iPhone, iPad, Android, and desktop browsers.
+      const fillTextFromRight = (text, right, y, minLeft = 0) => {
+        context.textAlign = 'left';
+        const textWidth = context.measureText(text).width;
+        context.fillText(text, Math.max(minLeft, right - textWidth), y);
+      };
+
+      const gradient = context.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, '#17101f');
+      gradient.addColorStop(0.55, '#120d18');
+      gradient.addColorStop(1, '#21112d');
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, width, height);
+
+      const glow = context.createRadialGradient(900, 20, 0, 900, 20, 650);
+      glow.addColorStop(0, 'rgba(153, 74, 218, 0.28)');
+      glow.addColorStop(1, 'rgba(153, 74, 218, 0)');
+      context.fillStyle = glow;
+      context.fillRect(0, 0, width, 700);
+
+      context.fillStyle = '#c894ef';
+      context.font = '800 34px "Noto Sans Thai", sans-serif';
+      context.fillText('หารกัน', 72, 82);
+      context.fillStyle = '#f8f1fb';
+      context.font = '800 64px "Noto Sans Thai", sans-serif';
+      context.fillText(summaryEventName, 72, 162, 936);
+
+      fillRoundedRect(72, 202, 936, 102, 25, 'rgba(152, 79, 207, 0.18)');
+      context.fillStyle = '#a999b3';
+      context.font = '700 25px "Noto Sans Thai", sans-serif';
+      context.fillText('ยอดรวมทั้งหมด', 104, 242);
+      context.fillStyle = '#f4ddff';
+      context.font = '800 44px "Noto Sans Thai", sans-serif';
+      fillTextFromRight(`฿${summaryTotal.toFixed(2)}`, 974, 270, 480);
+
+      context.fillStyle = '#a999b3';
+      context.font = '800 25px "Noto Sans Thai", sans-serif';
+      context.fillText(`รายการอาหาร · ${summaryBillItems.length} รายการ`, 74, 358);
+
+      let currentY = 388;
+      foodLayouts.forEach(({ item, payerLines, height: rowHeight }, index) => {
+        fillRoundedRect(64, currentY, 952, rowHeight, 24, index % 2 === 0 ? '#281e31' : '#241a2c');
+
+        fillRoundedRect(88, currentY + 24, 48, 48, 15, '#3b2949');
+        context.fillStyle = '#d1a2ef';
+        context.font = '800 24px "Noto Sans Thai", sans-serif';
+        const numberText = String(index + 1);
+        context.fillText(numberText, 112 - context.measureText(numberText).width / 2, currentY + 57);
+
+        context.fillStyle = '#f4edf7';
+        context.font = '700 31px "Noto Sans Thai", sans-serif';
+        context.fillText(`${item.name} ×${item.quantity}`, 158, currentY + 50, 560);
+        context.fillStyle = '#d99cff';
+        context.font = '800 32px "Noto Sans Thai", sans-serif';
+        fillTextFromRight(`฿${Number(item.amount).toFixed(2)}`, 978, currentY + 51, 755);
+
+        context.fillStyle = '#aa9bb3';
+        context.font = '600 26px "Noto Sans Thai", sans-serif';
+        payerLines.forEach((line, lineIndex) => {
+          context.fillText(line, 158, currentY + 88 + lineIndex * 34, 800);
+        });
+        currentY += rowHeight + 14;
       });
-      lines.push(currentLine);
-      return lines;
-    };
 
-    const foodLayouts = summaryBillItems.map((item, index) => {
-      const payerLines = makePayerLines(summaryAllocations[index] || []);
-      return { item, payerLines, height: 102 + payerLines.length * 34 };
-    });
-    const foodSectionHeight = foodLayouts.reduce((sum, layout) => sum + layout.height + 14, 0);
-    const height = Math.max(1200, 470 + foodSectionHeight + summarySettlements.length * 92 + 230);
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext('2d');
-    const gradient = context.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#fbf9ff');
-    gradient.addColorStop(1, '#eee7f8');
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, width, height);
+      currentY += 42;
+      context.fillStyle = '#a999b3';
+      context.font = '800 25px "Noto Sans Thai", sans-serif';
+      context.fillText(`ยอดที่ต้องจ่าย · ${summarySettlements.length} คน`, 74, currentY);
+      currentY += 28;
 
-    context.fillStyle = '#6b35aa';
-    context.font = '800 42px "Noto Sans Thai", sans-serif';
-    context.fillText('หารกัน', 90, 100);
-    context.fillStyle = '#241832';
-    context.font = '800 68px "Noto Sans Thai", sans-serif';
-    context.fillText(summaryEventName, 90, 190, 900);
-    context.fillStyle = '#8b7d96';
-    context.font = '800 27px "Noto Sans Thai", sans-serif';
-    context.fillText('รายการอาหาร', 90, 275);
-
-    let currentY = 310;
-    foodLayouts.forEach(({ item, payerLines, height: rowHeight }, index) => {
-      context.fillStyle = index % 2 === 0 ? '#ffffff' : '#f7f2fb';
-      context.beginPath();
-      context.roundRect(70, currentY, 940, rowHeight, 22);
-      context.fill();
-
-      context.fillStyle = '#30223d';
-      context.font = '700 32px "Noto Sans Thai", sans-serif';
-      context.fillText(`${index + 1}. ${item.name} ×${item.quantity}`, 105, currentY + 48, 680);
-      context.fillStyle = '#6c35a7';
-      context.font = '800 33px "Noto Sans Thai", sans-serif';
-      context.textAlign = 'right';
-      context.fillText(`฿${Number(item.amount).toFixed(2)}`, 965, currentY + 48);
-      context.textAlign = 'left';
-
-      context.fillStyle = '#806f8d';
-      context.font = '600 27px "Noto Sans Thai", sans-serif';
-      payerLines.forEach((line, lineIndex) => {
-        context.fillText(line, 105, currentY + 88 + lineIndex * 34, 850);
+      summarySettlements.forEach((settlement, index) => {
+        const y = currentY + index * 94;
+        fillRoundedRect(64, y, 952, 80, 22, index % 2 === 0 ? '#281e31' : '#241a2c');
+        context.fillStyle = '#f1e9f5';
+        context.font = '700 32px "Noto Sans Thai", sans-serif';
+        context.fillText(settlement.name, 100, y + 52, 610);
+        context.fillStyle = '#d99cff';
+        context.font = '800 34px "Noto Sans Thai", sans-serif';
+        fillTextFromRight(`฿${Number(settlement.amount).toFixed(2)}`, 978, y + 53, 750);
       });
-      currentY += rowHeight + 14;
-    });
 
-    currentY += 46;
-    context.fillStyle = '#8b7d96';
-    context.font = '800 27px "Noto Sans Thai", sans-serif';
-    context.fillText('ยอดที่ต้องจ่าย', 90, currentY);
-    currentY += 38;
-
-    summarySettlements.forEach((settlement, index) => {
-      const y = currentY + index * 92;
-      context.fillStyle = index % 2 === 0 ? '#ffffff' : '#f7f2fb';
-      context.beginPath();
-      context.roundRect(70, y, 940, 78, 22);
-      context.fill();
-      context.fillStyle = '#30223d';
-      context.font = '700 34px "Noto Sans Thai", sans-serif';
-      context.fillText(settlement.name, 105, y + 52, 600);
-      context.fillStyle = '#6c35a7';
-      context.font = '800 36px "Noto Sans Thai", sans-serif';
-      context.textAlign = 'right';
-      context.fillText(`฿${settlement.amount.toFixed(2)}`, 965, y + 52);
-      context.textAlign = 'left';
-    });
-
-    context.fillStyle = '#897a94';
-    context.font = '600 26px "Noto Sans Thai", sans-serif';
-    context.fillText(`รวมทั้งสิ้น ฿${summaryTotal.toFixed(2)}`, 90, height - 80);
+      context.fillStyle = '#756a7c';
+      context.font = '700 23px "Noto Sans Thai", sans-serif';
+      context.fillText('HARN KUN · แบ่งง่าย จ่ายชัด', 72, height - 64);
 
       const safeEventName = summaryEventName.replace(/[^A-Za-z0-9\u0E00-\u0E7F]+/g, '-') || 'harn-kun';
       const fileName = `${safeEventName}-summary.png`;
@@ -876,7 +920,7 @@ function App() {
   return (
     <ClickSpark as="main" className="app">
       <div className="silk-background" aria-hidden="true">
-        <Silk color="#A855F7" />
+        <Silk color="#0F1042" />
       </div>
       <div className="intro-blackout" aria-hidden="true" />
 
