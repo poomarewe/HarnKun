@@ -3608,6 +3608,10 @@ html .hero .react-bits-title {
   opacity: 1;
 }
 
+html .hero {
+  animation: none;
+}
+
 html .hero > .eyebrow {
   animation: intro-component-reveal 360ms 40ms var(--ease-out) both;
 }
