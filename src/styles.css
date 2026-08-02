@@ -1,19 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Noto+Sans+Thai:wght@100..900&display=swap');
-
 :root {
   --visible-height: 100dvh;
   --visible-offset-top: 0px;
-  --purple-950: #35106f;
-  --purple-800: #5923ad;
-  --purple-600: #7b3fd2;
-  --purple-400: #ad71ee;
-  --surface: rgba(253, 251, 255, 0.97);
-  --line: rgba(78, 50, 105, 0.14);
+  --palette-lavender: #635985;
+  --palette-indigo: #443c68;
+  --palette-plum: #393053;
+  --palette-ink: #18122b;
+  --purple-950: var(--palette-ink);
+  --purple-800: var(--palette-plum);
+  --purple-600: var(--palette-indigo);
+  --purple-400: var(--palette-lavender);
+  --surface: rgba(24, 18, 43, 0.98);
+  --line: rgba(99, 89, 133, 0.38);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   font-family: 'Manrope', system-ui, sans-serif;
-  color: #211936;
-  background: #ece8f4;
+  color: #fff;
+  background: var(--palette-ink);
   font-synthesis: none;
 }
 
@@ -66,7 +68,7 @@ img {
   isolation: isolate;
   -webkit-user-select: none;
   user-select: none;
-  background: #17051f;
+  background: var(--palette-ink);
   transition: opacity 180ms ease;
 }
 
@@ -75,7 +77,7 @@ img {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: rgba(10, 2, 14, 0.28);
+  background: rgba(24, 18, 43, 0.3);
   pointer-events: none;
 }
 
@@ -84,6 +86,10 @@ img {
   inset: 0;
   z-index: -2;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 76% 18%, rgba(99, 89, 133, 0.78), transparent 34%),
+    radial-gradient(circle at 20% 84%, rgba(68, 60, 104, 0.78), transparent 38%),
+    linear-gradient(145deg, var(--palette-ink) 0%, var(--palette-plum) 52%, var(--palette-ink) 100%);
   pointer-events: none;
 }
 
@@ -91,6 +97,12 @@ img {
   display: block;
   width: 100% !important;
   height: 100% !important;
+  animation: silk-canvas-reveal 520ms ease-out both;
+}
+
+@keyframes silk-canvas-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .glow {
@@ -2730,7 +2742,6 @@ html .react-bits-title {
 
 .pressure-shine-title {
   color: #ead7fb;
-  animation: pressure-title-settle 360ms var(--ease-out) both;
   filter: drop-shadow(0 14px 22px rgba(23, 3, 34, 0.26));
 }
 
@@ -3591,69 +3602,26 @@ html .bill-footer-actions .save-button {
   }
 }
 
-/* First-load sequence: black curtain, title, then supporting interface. */
-.intro-blackout {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  background: #000;
-  pointer-events: auto;
-  animation: intro-blackout-reveal 800ms cubic-bezier(0.55, 0, 0.25, 1) both;
-}
-
+/* Keep the first paint readable, then gently reveal secondary controls. */
 html .hero .react-bits-title {
-  animation: intro-title-reveal 700ms 100ms var(--ease-out) both;
+  visibility: visible;
+  opacity: 1;
 }
 
 html .hero > .eyebrow {
-  animation: intro-component-reveal 560ms 800ms var(--ease-out) both;
+  animation: intro-component-reveal 360ms 40ms var(--ease-out) both;
 }
 
 html .hero > p {
-  animation: intro-component-reveal 560ms 910ms var(--ease-out) both;
+  animation: intro-component-reveal 360ms 80ms var(--ease-out) both;
 }
 
 html .hero > .hero-start-button {
-  animation: intro-component-reveal 600ms 1.02s var(--ease-out) both;
+  animation: intro-component-reveal 380ms 120ms var(--ease-out) both;
 }
 
 html .staggered-menu-toggle {
-  animation: intro-menu-reveal 560ms 1.13s var(--ease-out) both;
-}
-
-@keyframes intro-blackout-reveal {
-  0%,
-  12% {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-  }
-
-  99% {
-    opacity: 0;
-    visibility: visible;
-    pointer-events: auto;
-  }
-
-  100% {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-  }
-}
-
-@keyframes intro-title-reveal {
-  from {
-    opacity: 0;
-    filter: blur(8px);
-    transform: translateY(22px) scale(0.96);
-  }
-
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: translateY(0) scale(1);
-  }
+  animation: intro-menu-reveal 360ms 100ms var(--ease-out) both;
 }
 
 @keyframes intro-component-reveal {
@@ -3693,10 +3661,6 @@ html .staggered-menu-toggle {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .intro-blackout {
-    display: none;
-  }
-
   html .hero .react-bits-title,
   html .hero > .eyebrow,
   html .hero > p,
@@ -3706,6 +3670,18 @@ html .staggered-menu-toggle {
     opacity: 1;
     animation: none !important;
     filter: none;
+    transform: none;
+  }
+}
+
+@media (max-width: 699px) {
+  html .hero > .eyebrow,
+  html .hero > p,
+  html .hero > .hero-start-button,
+  html .staggered-menu-toggle {
+    visibility: visible;
+    opacity: 1;
+    animation: none;
     transform: none;
   }
 }
@@ -3764,4 +3740,297 @@ html .staggered-menu-toggle {
     height: 100%;
     max-height: none;
   }
+}
+
+/* Unified Harn Kun palette
+   Lavender #635985 · Indigo #443C68 · Plum #393053 · Ink #18122B */
+html[data-theme='dark'] {
+  --bits-ink: #fff;
+  --bits-muted: rgba(255, 255, 255, 0.68);
+  --bits-purple: var(--palette-lavender);
+  --bits-purple-bright: var(--palette-lavender);
+  --bits-purple-soft: var(--palette-indigo);
+  --bits-glass: rgba(57, 48, 83, 0.94);
+  --bits-glass-strong: rgba(68, 60, 104, 0.98);
+  --bits-border: rgba(99, 89, 133, 0.62);
+  color: #fff;
+  background: var(--palette-ink);
+}
+
+html[data-theme='dark'] body,
+html[data-theme='dark'] .app {
+  background: var(--palette-ink);
+}
+
+html[data-theme='dark'] .app {
+  background-image:
+    radial-gradient(circle at 70% 20%, rgba(99, 89, 133, 0.3), transparent 34%),
+    linear-gradient(155deg, var(--palette-ink) 0%, var(--palette-plum) 58%, var(--palette-ink) 100%);
+}
+
+html[data-theme='dark'] .app::before {
+  background:
+    linear-gradient(rgba(99, 89, 133, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 89, 133, 0.11) 1px, transparent 1px),
+    rgba(24, 18, 43, 0.16);
+  background-size: 42px 42px;
+}
+
+html[data-theme='dark'] .silk-background {
+  background:
+    radial-gradient(circle at 76% 18%, rgba(99, 89, 133, 0.78), transparent 34%),
+    radial-gradient(circle at 20% 84%, rgba(68, 60, 104, 0.82), transparent 38%),
+    linear-gradient(145deg, var(--palette-ink), var(--palette-plum) 52%, var(--palette-ink));
+}
+
+html[data-theme='dark'] .glow-one {
+  background: rgba(99, 89, 133, 0.24);
+}
+
+html[data-theme='dark'] .glow-two {
+  background-color: rgba(68, 60, 104, 0.16);
+}
+
+html[data-theme='dark'] .baht-background span {
+  color: rgba(99, 89, 133, 0.16);
+}
+
+html[data-theme='dark'] .eyebrow,
+html[data-theme='dark'] .hero p {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+html[data-theme='dark'] .pressure-shine-title,
+html[data-theme='dark'] .pressure-shine-character,
+html[data-theme='dark'] .split-title-character {
+  color: #635985;
+}
+
+html[data-theme='dark'] .specular-button,
+html[data-theme='dark'] .hero-start-button {
+  --sb-tint: #635985;
+  border-color: rgba(99, 89, 133, 0.9);
+  background: linear-gradient(135deg, var(--palette-lavender), var(--palette-indigo));
+  box-shadow: 0 14px 34px rgba(24, 18, 43, 0.42);
+}
+
+html[data-theme='dark'] .overlay {
+  background: rgba(24, 18, 43, 0.76);
+}
+
+html[data-theme='dark'] .operation-panel,
+html[data-theme='dark'] .history-panel {
+  border-color: rgba(99, 89, 133, 0.52);
+  color: #fff;
+  background: linear-gradient(150deg, rgba(57, 48, 83, 0.99), rgba(24, 18, 43, 0.99));
+  box-shadow: 0 24px 60px rgba(24, 18, 43, 0.46);
+}
+
+html[data-theme='dark'] .panel-handle {
+  background: var(--palette-lavender);
+}
+
+html[data-theme='dark'] .panel-heading h2,
+html[data-theme='dark'] .split-food-card h3,
+html[data-theme='dark'] .result-event strong,
+html[data-theme='dark'] .history-empty strong,
+html[data-theme='dark'] .history-food-row strong,
+html[data-theme='dark'] .history-payment-row strong,
+html[data-theme='dark'] .settlement-row > strong,
+html[data-theme='dark'] .bill-preview strong {
+  color: #fff;
+}
+
+html[data-theme='dark'] .panel-heading span,
+html[data-theme='dark'] .operation-panel label,
+html[data-theme='dark'] .friends-heading,
+html[data-theme='dark'] .bill-list-heading,
+html[data-theme='dark'] .payer-heading,
+html[data-theme='dark'] .history-detail h3,
+html[data-theme='dark'] .result-event > span,
+html[data-theme='dark'] .split-food-card > span {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+html[data-theme='dark'] .operation-panel input {
+  border-color: rgba(99, 89, 133, 0.72);
+  color: #fff;
+  background: var(--palette-ink);
+}
+
+html[data-theme='dark'] .operation-panel input:focus {
+  border-color: var(--palette-lavender);
+  background: var(--palette-ink);
+  box-shadow: 0 0 0 4px rgba(99, 89, 133, 0.24);
+}
+
+html[data-theme='dark'] .operation-panel input::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+html[data-theme='dark'] .scan-start-options > button,
+html[data-theme='dark'] .bill-preview,
+html[data-theme='dark'] .scan-progress,
+html[data-theme='dark'] .bill-item,
+html[data-theme='dark'] .bill-total,
+html[data-theme='dark'] .split-food-card,
+html[data-theme='dark'] .result-event,
+html[data-theme='dark'] .settlement-row,
+html[data-theme='dark'] .history-detail-summary,
+html[data-theme='dark'] .history-card,
+html[data-theme='dark'] .history-food-row,
+html[data-theme='dark'] .history-payment-row,
+html[data-theme='dark'] .history-empty,
+html[data-theme='dark'] .payer-option {
+  border-color: rgba(99, 89, 133, 0.56);
+  color: #fff;
+  background: var(--palette-plum);
+  box-shadow: 0 10px 28px rgba(24, 18, 43, 0.24);
+}
+
+html[data-theme='dark'] .scan-start-options > button:hover,
+html[data-theme='dark'] .history-card:hover,
+html[data-theme='dark'] .payer-option.selected {
+  border-color: var(--palette-lavender);
+  color: #fff;
+  background: var(--palette-indigo);
+}
+
+html[data-theme='dark'] .friend-chip,
+html[data-theme='dark'] .previous-button,
+html[data-theme='dark'] .done-button,
+html[data-theme='dark'] .upload-button,
+html[data-theme='dark'] .close-button,
+html[data-theme='dark'] .small-back-button,
+html[data-theme='dark'] .history-back-button,
+html[data-theme='dark'] .select-all-button,
+html[data-theme='dark'] .bill-item button {
+  border-color: rgba(99, 89, 133, 0.56);
+  color: #fff;
+  background: var(--palette-indigo);
+}
+
+html[data-theme='dark'] .save-button,
+html[data-theme='dark'] .next-button,
+html[data-theme='dark'] .download-button,
+html[data-theme='dark'] .camera-button,
+html[data-theme='dark'] .add-button,
+html[data-theme='dark'] .apply-button {
+  border-color: var(--palette-lavender);
+  color: #fff;
+  background: linear-gradient(135deg, var(--palette-lavender), var(--palette-indigo));
+  box-shadow: 0 10px 24px rgba(24, 18, 43, 0.32);
+}
+
+html[data-theme='dark'] .friends-title h2 strong,
+html[data-theme='dark'] .title-edit,
+html[data-theme='dark'] .manual-item-button,
+html[data-theme='dark'] .bill-total strong,
+html[data-theme='dark'] .split-food-card strong,
+html[data-theme='dark'] .settlement-row > b,
+html[data-theme='dark'] .history-card > b,
+html[data-theme='dark'] .history-food-row > b,
+html[data-theme='dark'] .history-payment-row b,
+html[data-theme='dark'] .history-detail-summary strong {
+  color: #fff;
+}
+
+html[data-theme='dark'] .settlement-row > span,
+html[data-theme='dark'] .payer-check,
+html[data-theme='dark'] .scan-option-icon {
+  border-color: var(--palette-lavender);
+  color: #fff;
+  background: var(--palette-lavender);
+}
+
+html[data-theme='dark'] .empty-list,
+html[data-theme='dark'] .scan-intro p,
+html[data-theme='dark'] .history-message,
+html[data-theme='dark'] .history-empty p,
+html[data-theme='dark'] .history-food-row span,
+html[data-theme='dark'] .history-food-row p,
+html[data-theme='dark'] .bill-preview span,
+html[data-theme='dark'] .result-event small,
+html[data-theme='dark'] .split-food-card small,
+html[data-theme='dark'] .history-detail-summary small,
+html[data-theme='dark'] .scan-start-options small {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+html[data-theme='dark'] .add-button:disabled,
+html[data-theme='dark'] .save-button:disabled,
+html[data-theme='dark'] .scan-start-options > button:disabled,
+html[data-theme='dark'] .scan-actions button:disabled,
+html[data-theme='dark'] .bill-preview button:disabled,
+html[data-theme='dark'] .split-navigation button:disabled {
+  color: rgba(255, 255, 255, 0.42);
+  background: var(--palette-plum);
+}
+
+html[data-theme='dark'] .form-error {
+  border-color: var(--palette-lavender);
+  color: #fff;
+  background: var(--palette-indigo);
+}
+
+.staggered-menu-toggle {
+  color: #fff;
+}
+
+.staggered-menu-toggle:focus-visible,
+.staggered-menu-panel nav button:focus-visible,
+.staggered-menu-clear:focus-visible,
+.staggered-menu-instagram:focus-visible {
+  outline-color: var(--palette-lavender);
+}
+
+.staggered-menu-backdrop {
+  background: rgba(24, 18, 43, 0.72);
+}
+
+.staggered-menu-layer-back {
+  background: var(--palette-indigo);
+}
+
+.staggered-menu-layer-middle {
+  background: var(--palette-lavender);
+}
+
+.staggered-menu-panel {
+  color: #fff;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(99, 89, 133, 0.34), transparent 38%),
+    linear-gradient(160deg, var(--palette-plum), var(--palette-ink) 78%);
+}
+
+.staggered-menu-brand,
+.staggered-menu-panel nav button {
+  border-color: rgba(99, 89, 133, 0.46);
+}
+
+.staggered-menu-brand > span,
+.staggered-menu-panel nav button:hover,
+.staggered-menu-clear:hover:not(:disabled),
+.staggered-menu-instagram:hover {
+  color: #fff;
+}
+
+.staggered-menu-brand p,
+.staggered-menu-panel nav small,
+.staggered-menu-footer,
+.staggered-menu-clear,
+.staggered-menu-instagram {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.staggered-history-content .history-card {
+  border-color: rgba(99, 89, 133, 0.58);
+  color: #fff;
+  background: var(--palette-plum);
+}
+
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline-color: var(--palette-lavender);
 }

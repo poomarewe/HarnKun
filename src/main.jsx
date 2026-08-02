@@ -1,11 +1,12 @@
-import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, StrictMode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import HeroTitle from './HeroTitle';
 import { BitsButton, BitsSurface, ClickSpark } from './ReactBitsUI';
-import Silk from './Silk';
 import SpecularButton from './SpecularButton';
 import StaggeredMenu from './StaggeredMenu';
 import './styles.css';
+
+const Silk = lazy(() => import('./Silk'));
 
 const THAI_DIGITS = { '๐': '0', '๑': '1', '๒': '2', '๓': '3', '๔': '4', '๕': '5', '๖': '6', '๗': '7', '๘': '8', '๙': '9' };
 const SUMMARY_WORDS = /(?:ยอดรวม|รวมมูลค่า|รวมทั้งสิ้น|ยอดสุทธิ|สุทธิ|จำนวน\s*\d*\s*ชิ้น|subtotal|total|vat|ภาษี|service|ค่าบริการ|ส่วนลด|discount|เงินสด|เงินทอน|change|ชำระ)/i;
@@ -279,6 +280,7 @@ async function clearHistoryRecords() {
 }
 
 function App() {
+  const [silkReady, setSilkReady] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [historyView, setHistoryView] = useState(null);
   const [historyRecords, setHistoryRecords] = useState([]);
@@ -308,6 +310,29 @@ function App() {
     () => billItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
     [billItems],
   );
+
+  useEffect(() => {
+    let idleHandle;
+    let fallbackTimer;
+
+    const showSilk = () => setSilkReady(true);
+    const scheduleSilk = () => {
+      if ('requestIdleCallback' in window) {
+        idleHandle = window.requestIdleCallback(showSilk, { timeout: 1600 });
+      } else {
+        fallbackTimer = window.setTimeout(showSilk, 500);
+      }
+    };
+
+    if (document.readyState === 'complete') scheduleSilk();
+    else window.addEventListener('load', scheduleSilk, { once: true });
+
+    return () => {
+      window.removeEventListener('load', scheduleSilk);
+      if (idleHandle !== undefined) window.cancelIdleCallback?.(idleHandle);
+      window.clearTimeout(fallbackTimer);
+    };
+  }, []);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -804,55 +829,55 @@ function App() {
       };
 
       const gradient = context.createLinearGradient(0, 0, width, height);
-      gradient.addColorStop(0, '#17101f');
-      gradient.addColorStop(0.55, '#120d18');
-      gradient.addColorStop(1, '#21112d');
+      gradient.addColorStop(0, '#18122B');
+      gradient.addColorStop(0.55, '#393053');
+      gradient.addColorStop(1, '#18122B');
       context.fillStyle = gradient;
       context.fillRect(0, 0, width, height);
 
       const glow = context.createRadialGradient(900, 20, 0, 900, 20, 650);
-      glow.addColorStop(0, 'rgba(153, 74, 218, 0.28)');
-      glow.addColorStop(1, 'rgba(153, 74, 218, 0)');
+      glow.addColorStop(0, 'rgba(99, 89, 133, 0.34)');
+      glow.addColorStop(1, 'rgba(99, 89, 133, 0)');
       context.fillStyle = glow;
       context.fillRect(0, 0, width, 700);
 
-      context.fillStyle = '#c894ef';
+      context.fillStyle = '#635985';
       context.font = '800 34px "Noto Sans Thai", sans-serif';
       context.fillText('หารกัน', 72, 82);
-      context.fillStyle = '#f8f1fb';
+      context.fillStyle = '#ffffff';
       context.font = '800 64px "Noto Sans Thai", sans-serif';
       context.fillText(summaryEventName, 72, 162, 936);
 
-      fillRoundedRect(72, 202, 936, 102, 25, 'rgba(152, 79, 207, 0.18)');
-      context.fillStyle = '#a999b3';
+      fillRoundedRect(72, 202, 936, 102, 25, 'rgba(99, 89, 133, 0.42)');
+      context.fillStyle = 'rgba(255, 255, 255, 0.72)';
       context.font = '700 25px "Noto Sans Thai", sans-serif';
       context.fillText('ยอดรวมทั้งหมด', 104, 242);
-      context.fillStyle = '#f4ddff';
+      context.fillStyle = '#ffffff';
       context.font = '800 44px "Noto Sans Thai", sans-serif';
       fillTextFromRight(`฿${summaryTotal.toFixed(2)}`, 974, 270, 480);
 
-      context.fillStyle = '#a999b3';
+      context.fillStyle = 'rgba(255, 255, 255, 0.72)';
       context.font = '800 25px "Noto Sans Thai", sans-serif';
       context.fillText(`รายการอาหาร · ${summaryBillItems.length} รายการ`, 74, 358);
 
       let currentY = 388;
       foodLayouts.forEach(({ item, payerLines, height: rowHeight }, index) => {
-        fillRoundedRect(64, currentY, 952, rowHeight, 24, index % 2 === 0 ? '#281e31' : '#241a2c');
+        fillRoundedRect(64, currentY, 952, rowHeight, 24, index % 2 === 0 ? '#393053' : '#443C68');
 
-        fillRoundedRect(88, currentY + 24, 48, 48, 15, '#3b2949');
-        context.fillStyle = '#d1a2ef';
+        fillRoundedRect(88, currentY + 24, 48, 48, 15, '#635985');
+        context.fillStyle = '#ffffff';
         context.font = '800 24px "Noto Sans Thai", sans-serif';
         const numberText = String(index + 1);
         context.fillText(numberText, 112 - context.measureText(numberText).width / 2, currentY + 57);
 
-        context.fillStyle = '#f4edf7';
+        context.fillStyle = '#ffffff';
         context.font = '700 31px "Noto Sans Thai", sans-serif';
         context.fillText(`${item.name} ×${item.quantity}`, 158, currentY + 50, 560);
-        context.fillStyle = '#d99cff';
+        context.fillStyle = '#ffffff';
         context.font = '800 32px "Noto Sans Thai", sans-serif';
         fillTextFromRight(`฿${Number(item.amount).toFixed(2)}`, 978, currentY + 51, 755);
 
-        context.fillStyle = '#aa9bb3';
+        context.fillStyle = 'rgba(255, 255, 255, 0.7)';
         context.font = '600 26px "Noto Sans Thai", sans-serif';
         payerLines.forEach((line, lineIndex) => {
           context.fillText(line, 158, currentY + 88 + lineIndex * 34, 800);
@@ -861,23 +886,23 @@ function App() {
       });
 
       currentY += 42;
-      context.fillStyle = '#a999b3';
+      context.fillStyle = 'rgba(255, 255, 255, 0.72)';
       context.font = '800 25px "Noto Sans Thai", sans-serif';
       context.fillText(`ยอดที่ต้องจ่าย · ${summarySettlements.length} คน`, 74, currentY);
       currentY += 28;
 
       summarySettlements.forEach((settlement, index) => {
         const y = currentY + index * 94;
-        fillRoundedRect(64, y, 952, 80, 22, index % 2 === 0 ? '#281e31' : '#241a2c');
-        context.fillStyle = '#f1e9f5';
+        fillRoundedRect(64, y, 952, 80, 22, index % 2 === 0 ? '#393053' : '#443C68');
+        context.fillStyle = '#ffffff';
         context.font = '700 32px "Noto Sans Thai", sans-serif';
         context.fillText(settlement.name, 100, y + 52, 610);
-        context.fillStyle = '#d99cff';
+        context.fillStyle = '#ffffff';
         context.font = '800 34px "Noto Sans Thai", sans-serif';
         fillTextFromRight(`฿${Number(settlement.amount).toFixed(2)}`, 978, y + 53, 750);
       });
 
-      context.fillStyle = '#756a7c';
+      context.fillStyle = 'rgba(255, 255, 255, 0.56)';
       context.font = '700 23px "Noto Sans Thai", sans-serif';
       context.fillText('HARN KUN · แบ่งง่าย จ่ายชัด', 72, height - 64);
 
@@ -920,9 +945,12 @@ function App() {
   return (
     <ClickSpark as="main" className="app">
       <div className="silk-background" aria-hidden="true">
-        <Silk color="#0F1042" />
+        {silkReady && (
+          <Suspense fallback={null}>
+            <Silk color="#443C68" />
+          </Suspense>
+        )}
       </div>
-      <div className="intro-blackout" aria-hidden="true" />
 
       <section className="hero" aria-label="Harn Kun home">
         <span className="eyebrow">WELCOME TO</span>

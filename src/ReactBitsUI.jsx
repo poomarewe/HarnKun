@@ -40,7 +40,7 @@ export const BitsSurface = forwardRef(function BitsSurface(
   {
     as: Component = 'div',
     className = '',
-    spotlightColor = 'rgba(216, 180, 254, 0.16)',
+    spotlightColor = 'rgba(99, 89, 133, 0.24)',
     onPointerMove,
     style,
     ...props
@@ -68,7 +68,7 @@ export const BitsSurface = forwardRef(function BitsSurface(
 export function ClickSpark({
   as: Component = 'div',
   className = '',
-  sparkColor = '#e9d5ff',
+  sparkColor = '#635985',
   sparkSize = 8,
   sparkRadius = 22,
   sparkCount = 8,

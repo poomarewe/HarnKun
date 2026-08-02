@@ -85,7 +85,7 @@ const compileShader = (gl, type, source) => {
 export default function Silk({
   speed = 5,
   scale = 1,
-  color = '#7B7481',
+  color = '#443C68',
   noiseIntensity = 1.5,
   rotation = 0,
 }) {

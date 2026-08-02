@@ -2,7 +2,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from 'react';
 
 // A Thai-safe composition of the ReactBits Split Text, Shiny Text, and
@@ -11,7 +10,7 @@ import {
 // https://reactbits.dev/text-animations/shiny-text
 // https://reactbits.dev/text-animations/text-pressure
 
-const BASE_COLOR = [234, 215, 251];
+const BASE_COLOR = [99, 89, 133];
 const SHINE_COLOR = [255, 255, 255];
 
 const mixColor = (from, to, amount) => (
@@ -23,59 +22,14 @@ const mixColor = (from, to, amount) => (
 export default function HeroTitle({ text }) {
   const containerRef = useRef(null);
   const characterRefs = useRef([]);
-  const [fontReady, setFontReady] = useState(false);
-  const [stage, setStage] = useState(() => (
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      ? 'pressure'
-      : 'split'
-  ));
   const characters = useMemo(() => [...text], [text]);
-  const lastVisibleIndex = useMemo(() => {
-    for (let index = characters.length - 1; index >= 0; index -= 1) {
-      if (characters[index].trim()) return index;
-    }
-    return 0;
-  }, [characters]);
 
   useEffect(() => {
-    let isActive = true;
-    const fallback = window.setTimeout(() => {
-      if (isActive) setFontReady(true);
-    }, 1200);
-
-    document.fonts
-      ?.load('800 64px "Noto Sans Thai"', text)
-      .then(() => {
-        if (!isActive) return;
-        window.clearTimeout(fallback);
-        setFontReady(true);
-      })
-      .catch(() => {
-        if (isActive) setFontReady(true);
-      });
-
-    return () => {
-      isActive = false;
-      window.clearTimeout(fallback);
-    };
-  }, [text]);
-
-  useEffect(() => {
-    if (stage !== 'split') return undefined;
-    const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const skipIntro = () => {
-      if (motionPreference.matches) setStage('pressure');
-    };
-    motionPreference.addEventListener?.('change', skipIntro);
-    return () => motionPreference.removeEventListener?.('change', skipIntro);
-  }, [stage]);
-
-  useEffect(() => {
-    if (stage !== 'pressure') return undefined;
     const container = containerRef.current;
     if (!container) return undefined;
 
     const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const coarsePointer = window.matchMedia('(pointer: coarse)');
     const pointer = { x: 0, y: 0 };
     const easedPointer = { x: 0, y: 0 };
     let animationFrame = 0;
@@ -174,7 +128,7 @@ export default function HeroTitle({ text }) {
     };
     const start = () => {
       stop();
-      if (document.hidden || motionPreference.matches) {
+      if (document.hidden || motionPreference.matches || coarsePointer.matches) {
         paintStaticFrame();
         return;
       }
@@ -190,6 +144,7 @@ export default function HeroTitle({ text }) {
     window.addEventListener('resize', centerPointer);
     document.addEventListener('visibilitychange', syncAnimation);
     motionPreference.addEventListener?.('change', syncAnimation);
+    coarsePointer.addEventListener?.('change', syncAnimation);
     start();
 
     return () => {
@@ -199,47 +154,29 @@ export default function HeroTitle({ text }) {
       window.removeEventListener('resize', centerPointer);
       document.removeEventListener('visibilitychange', syncAnimation);
       motionPreference.removeEventListener?.('change', syncAnimation);
+      coarsePointer.removeEventListener?.('change', syncAnimation);
     };
-  }, [characters, fontReady, stage]);
+  }, [characters]);
 
   return (
     <h1 className="animated-title react-bits-title" aria-label={text}>
-      {!fontReady ? (
-        <span className="title-font-placeholder" aria-hidden="true">{text}</span>
-      ) : stage === 'split' ? (
-        <span className="split-title" aria-hidden="true">
-          {characters.map((character, index) => (
-            <span
-              className={character.trim() ? 'split-title-character' : 'split-title-space'}
-              key={`${character}-${index}`}
-              style={{ '--split-index': index }}
-              onAnimationEnd={index === lastVisibleIndex
-                ? () => setStage('pressure')
-                : undefined}
-            >
-              {character === ' ' ? '\u00A0' : character}
-            </span>
-          ))}
-        </span>
-      ) : (
-        <span
-          ref={containerRef}
-          className="pressure-shine-title"
-          aria-hidden="true"
-        >
-          {characters.map((character, index) => (
-            <span
-              className={character.trim() ? 'pressure-shine-character' : 'pressure-shine-space'}
-              key={`${character}-${index}`}
-              ref={(element) => {
-                characterRefs.current[index] = element;
-              }}
-            >
-              {character === ' ' ? '\u00A0' : character}
-            </span>
-          ))}
-        </span>
-      )}
+      <span
+        ref={containerRef}
+        className="pressure-shine-title"
+        aria-hidden="true"
+      >
+        {characters.map((character, index) => (
+          <span
+            className={character.trim() ? 'pressure-shine-character' : 'pressure-shine-space'}
+            key={`${character}-${index}`}
+            ref={(element) => {
+              characterRefs.current[index] = element;
+            }}
+          >
+            {character === ' ' ? '\u00A0' : character}
+          </span>
+        ))}
+      </span>
     </h1>
   );
 }
