@@ -2449,6 +2449,24 @@ function App() {
                           })}
                           <BitsButton type="button" className="manual-item-button bill-list-add-button" onClick={addManualItem}>+ Add item manually</BitsButton>
                         </div>
+                      </>
+                    )}
+
+                    {billImageUrl && ocrStatus === 'idle' && (
+                      <div className="scan-actions">
+                        <BitsButton type="button" className="upload-button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
+                          {cooldownRemaining > 0 ? `Try again in ${cooldownRemaining}s` : 'Try another photo'}
+                        </BitsButton>
+                      </div>
+                    )}
+                  </>
+                ))}
+
+                {!cameraFlow && error && <p className="form-error" role="alert">{error}</p>}
+                {!cameraFlow && ocrStatus !== 'scanning' && (
+                  <div className="bill-footer-actions">
+                    {(ocrStatus === 'review' || billItems.length > 0) && (
+                      <>
                         <BitsSurface className="bill-adjustments" aria-label="Bill adjustments">
                           <div className={`bill-adjustment-row${vatEnabled ? ' is-enabled' : ''}`}>
                             <label className="bill-adjustment-toggle">
@@ -2473,24 +2491,6 @@ function App() {
                             </label>
                           </div>
                         </BitsSurface>
-                      </>
-                    )}
-
-                    {billImageUrl && ocrStatus === 'idle' && (
-                      <div className="scan-actions">
-                        <BitsButton type="button" className="upload-button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
-                          {cooldownRemaining > 0 ? `Try again in ${cooldownRemaining}s` : 'Try another photo'}
-                        </BitsButton>
-                      </div>
-                    )}
-                  </>
-                ))}
-
-                {!cameraFlow && error && <p className="form-error" role="alert">{error}</p>}
-                {!cameraFlow && ocrStatus !== 'scanning' && (
-                  <div className="bill-footer-actions">
-                    {(ocrStatus === 'review' || billItems.length > 0) && (
-                      <>
                         <BitsSurface className="bill-total">
                           <span>TOTAL</span>
                           <div className="bill-total-breakdown">

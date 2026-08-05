@@ -5041,7 +5041,23 @@ html[data-theme='dark'] .bill-item .bill-done-button {
 
   html .bill-item.bill-item-compact {
     min-height: 48px;
+    opacity: 1;
+    background-clip: padding-box;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     touch-action: pan-y;
+  }
+
+  html[data-theme='finance'] .bill-item-shell > .bill-item.bill-item-compact {
+    border-color: rgba(66, 184, 131, 0.24);
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(23, 50, 77, 0.08);
+  }
+
+  html[data-theme='dark'] .bill-item-shell > .bill-item.bill-item-compact {
+    border-color: rgba(52, 211, 153, 0.22);
+    background: #1e293b;
+    box-shadow: 0 8px 20px rgba(2, 6, 23, 0.24);
   }
 
   html .bill-item.bill-item-compact.swiping-edit,
@@ -6252,24 +6268,45 @@ html[data-theme='dark'] .bill-total-breakdown small {
 
 @media (max-width: 699px) {
   html .bill-adjustments {
-    grid-template-columns: 1fr;
-    gap: 7px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 0;
     padding: 0;
   }
 
   html .bill-adjustment-row {
-    grid-template-columns: minmax(0, 1fr) 100px;
-    gap: 8px;
-    min-height: 58px;
-    padding: 8px 9px;
+    grid-template-columns: minmax(0, 1fr) 68px;
+    gap: 6px;
+    min-height: 50px;
+    padding: 6px;
+    border-radius: 14px;
   }
 
   html .bill-adjustment-toggle small {
     display: none;
   }
 
+  html .bill-adjustment-toggle {
+    gap: 6px;
+  }
+
+  html .bill-adjustment-toggle strong {
+    overflow: hidden;
+    font-size: 0.68rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  html .bill-adjustment-check {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+  }
+
   html .bill-adjustment-input {
-    width: 94px;
+    width: 68px;
+    height: 34px;
+    padding: 0 7px;
   }
 
   html .bill-total {
