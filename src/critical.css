@@ -31,6 +31,26 @@ body {
   overscroll-behavior: none;
 }
 
+.app-version {
+  position: fixed;
+  bottom: max(6px, env(safe-area-inset-bottom));
+  left: max(8px, env(safe-area-inset-left));
+  z-index: 120;
+  color: #475569;
+  font-size: 0.52rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  opacity: 0.28;
+  pointer-events: none;
+  user-select: none;
+}
+
+html[data-theme='dark'] .app-version {
+  color: #cbd5e1;
+  opacity: 0.24;
+}
+
 button {
   font: inherit;
   -webkit-tap-highlight-color: transparent;

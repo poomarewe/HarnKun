@@ -6,6 +6,8 @@ import StaggeredMenu from './StaggeredMenu';
 import './critical.css';
 
 const Silk = lazy(() => import('./Silk'));
+const APP_VERSION = __APP_VERSION__;
+const APP_VERSION_TIME = __APP_VERSION_TIME__;
 let appStylesPromise;
 
 const loadAppStyles = () => {
@@ -1909,6 +1911,7 @@ function App() {
   if (isSharedHistoryRoute) {
     return (
       <main className="shared-receipt-page">
+        <small className="app-version" title={`Git version from ${APP_VERSION_TIME}`}>{APP_VERSION}</small>
         <section className="shared-receipt-shell" aria-label="Shared bill details">
           <header className="shared-receipt-header">
             <a href="/" className="shared-receipt-brand" aria-label="Go to Harn Kun home">Harn Kun</a>
@@ -2028,6 +2031,7 @@ function App() {
 
   return (
     <ClickSpark as="main" className="app">
+      <small className="app-version" title={`Git version from ${APP_VERSION_TIME}`}>{APP_VERSION}</small>
       <div className="silk-background" aria-hidden="true">
         {silkReady && (
           <Suspense fallback={null}>
