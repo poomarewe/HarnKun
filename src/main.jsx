@@ -2447,7 +2447,9 @@ function App() {
                               </div>
                             );
                           })}
-                          <BitsButton type="button" className="manual-item-button bill-list-add-button" onClick={addManualItem}>+ Add item manually</BitsButton>
+                          {editingBillIndex === null && (
+                            <BitsButton type="button" className="manual-item-button bill-list-add-button" onClick={addManualItem}>+ Add item manually</BitsButton>
+                          )}
                         </div>
                       </>
                     )}

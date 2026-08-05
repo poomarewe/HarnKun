@@ -6323,4 +6323,93 @@ html[data-theme='dark'] .bill-total-breakdown small {
     gap: 5px;
     scrollbar-width: none;
   }
+
+  html .bill-adjustments + .bill-total {
+    margin-top: 12px;
+  }
+
+  html .bill-item-shell.is-editing {
+    overflow: visible;
+  }
+
+  html .bill-item-shell > .bill-item.bill-item-editor {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 11px;
+    padding: 14px;
+    border: 1px solid rgba(66, 184, 131, 0.28);
+    border-radius: 19px;
+    background: #fff;
+    box-shadow: 0 14px 34px rgba(23, 50, 77, 0.12);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  html .bill-item-editor .bill-field-name,
+  html .bill-item-editor .bill-edit-actions {
+    grid-column: 1 / -1;
+  }
+
+  html .bill-item-editor .bill-field-quantity,
+  html .bill-item-editor .bill-field-amount {
+    grid-column: auto;
+  }
+
+  html .bill-item-editor .bill-field > span {
+    color: #64748b;
+    font-size: 0.6rem;
+  }
+
+  html .bill-item-editor .bill-field input {
+    width: 100%;
+    height: 50px;
+    padding: 0 14px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 13px;
+    color: #0f172a;
+    background: #f4f7f5;
+    box-shadow: none;
+  }
+
+  html .bill-item-editor .bill-field input:focus {
+    border-color: #42b883;
+    outline: 3px solid rgba(66, 184, 131, 0.16);
+  }
+
+  html .bill-item-editor .bill-edit-actions {
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  html .bill-item .bill-edit-actions > button {
+    height: 46px;
+    border-radius: 12px;
+  }
+
+  html[data-theme='finance'] .bill-item .bill-delete-button {
+    border-color: rgba(194, 65, 12, 0.28);
+    color: #9a3412;
+    background: #fff7ed;
+  }
+
+  html[data-theme='finance'] .bill-item .bill-done-button {
+    border-color: #278b62;
+    color: #fff;
+    background: #278b62;
+  }
+
+  html[data-theme='dark'] .bill-item-shell > .bill-item.bill-item-editor {
+    border-color: rgba(52, 211, 153, 0.24);
+    background: #1e293b;
+    box-shadow: 0 14px 34px rgba(2, 6, 23, 0.3);
+  }
+
+  html[data-theme='dark'] .bill-item-editor .bill-field > span {
+    color: #aab6c5;
+  }
+
+  html[data-theme='dark'] .bill-item-editor .bill-field input {
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+    background: #0f172a;
+  }
 }
