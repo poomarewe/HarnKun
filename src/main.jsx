@@ -1950,24 +1950,53 @@ function App() {
               </div>
 
               <div className="shared-receipt-stats" aria-label="Bill summary">
-                <div><strong>{selectedHistory.friends.length}</strong><span>People</span></div>
-                <div><strong>{selectedHistory.billItems.length}</strong><span>Items</span></div>
+                <div><strong>{selectedHistory.friends.length}</strong><span>People sharing this bill</span></div>
+                <div><strong>{selectedHistory.billItems.length}</strong><span>Bill items</span></div>
+                <div><strong>{selectedHistory.allocations.reduce((sum, names) => sum + names.length, 0)}</strong><span>Item assignments</span></div>
               </div>
+
+              <section className="shared-receipt-section">
+                <div className="shared-receipt-section-heading"><span>PEOPLE ON THIS BILL</span><b>{selectedHistory.friends.length}</b></div>
+                <div className="shared-receipt-people">
+                  {selectedHistory.friends.map((friend, index) => (
+                    <div className="shared-receipt-person" key={friend}>
+                      <span>{index + 1}</span>
+                      <strong>{friend}</strong>
+                      <small>{selectedHistory.allocations.filter((names) => names.includes(friend)).length} shared items</small>
+                    </div>
+                  ))}
+                </div>
+              </section>
 
               <section className="shared-receipt-section">
                 <div className="shared-receipt-section-heading"><span>ITEMS & SHARING</span><b>{selectedHistory.billItems.length}</b></div>
                 <div className="shared-receipt-items">
-                  {selectedHistory.billItems.map((item, index) => (
-                    <article className="shared-receipt-item" key={`${item.name}-${index}`}>
-                      <span className="shared-receipt-number">{index + 1}</span>
-                      <div>
-                        <strong>{item.name}</strong>
-                        <small>Quantity {item.quantity}</small>
-                        <p>{(selectedHistory.allocations[index] || []).join(', ') || 'No people selected'}</p>
-                      </div>
-                      <b>฿{Number(item.amount).toFixed(2)}</b>
-                    </article>
-                  ))}
+                  {selectedHistory.billItems.map((item, index) => {
+                    const sharedWith = selectedHistory.allocations[index] || [];
+                    const amountPerPerson = sharedWith.length > 0 ? Number(item.amount) / sharedWith.length : 0;
+                    return (
+                      <article className="shared-receipt-item" key={`${item.name}-${index}`}>
+                        <header>
+                          <span className="shared-receipt-number">{index + 1}</span>
+                          <div>
+                            <strong>{item.name}</strong>
+                            <small>Quantity {item.quantity}</small>
+                          </div>
+                          <div className="shared-receipt-item-amount"><small>ITEM TOTAL</small><b>฿{Number(item.amount).toFixed(2)}</b></div>
+                        </header>
+                        <div className="shared-receipt-item-sharing">
+                          <span>SHARED WITH {sharedWith.length} {sharedWith.length === 1 ? 'PERSON' : 'PEOPLE'}</span>
+                          {sharedWith.length > 0 ? (
+                            <div>
+                              {sharedWith.map((friend) => (
+                                <span key={friend}><strong>{friend}</strong><small>฿{amountPerPerson.toFixed(2)}</small></span>
+                              ))}
+                            </div>
+                          ) : <p>No people selected for this item.</p>}
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               </section>
 
@@ -1977,8 +2006,8 @@ function App() {
                   {selectedHistory.settlements.map((settlement, index) => (
                     <article className="shared-receipt-payment" key={`${settlement.name}-${index}`}>
                       <span>{index + 1}</span>
-                      <strong>{settlement.name}</strong>
-                      <b>฿{Number(settlement.amount).toFixed(2)}</b>
+                      <div><strong>{settlement.name}</strong><small>Total amount to pay</small></div>
+                      <div><b>฿{Number(settlement.amount).toFixed(2)}</b><small>{Number(selectedHistory.total) > 0 ? `${(Number(settlement.amount) / Number(selectedHistory.total) * 100).toFixed(1)}% of bill` : '0% of bill'}</small></div>
                     </article>
                   ))}
                 </div>
