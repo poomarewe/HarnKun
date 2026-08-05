@@ -1311,6 +1311,411 @@ html[data-theme='finance'] .home-dashboard .home-create-button {
   }
 }
 
+/* Standalone read-only bill opened from a shared QR code. */
+.shared-receipt-page {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow-y: auto;
+  color: #0f172a;
+  background:
+    radial-gradient(circle at 92% 0%, rgba(52, 211, 153, 0.18), transparent 34%),
+    linear-gradient(rgba(39, 139, 98, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(39, 139, 98, 0.055) 1px, transparent 1px),
+    #f4f7f5;
+  background-size: auto, 36px 36px, 36px 36px, auto;
+}
+
+.shared-receipt-shell {
+  width: min(100%, 920px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: max(22px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(34px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+
+.shared-receipt-header,
+.shared-receipt-title,
+.shared-receipt-section-heading,
+.shared-receipt-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shared-receipt-header {
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.shared-receipt-brand {
+  color: #278b62;
+  font-size: 1.25rem;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.shared-receipt-header > span,
+.shared-receipt-title > div > span,
+.shared-receipt-section-heading > span,
+.shared-receipt-error > span {
+  color: #278b62;
+  font-size: 0.64rem;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+}
+
+.shared-receipt-header > span {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #e4f5ed;
+}
+
+.shared-receipt-detail {
+  padding-top: 28px;
+}
+
+.shared-receipt-title {
+  align-items: end;
+  gap: 20px;
+}
+
+.shared-receipt-title > div:first-child {
+  min-width: 0;
+}
+
+.shared-receipt-title h1 {
+  margin: 5px 0 4px;
+  overflow-wrap: anywhere;
+  font-size: clamp(2rem, 7vw, 4.5rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.shared-receipt-title p,
+.shared-receipt-item small,
+.shared-receipt-item p,
+.shared-receipt-footer > span {
+  color: #64748b;
+}
+
+.shared-receipt-title p {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.shared-receipt-total {
+  min-width: 190px;
+  padding: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 20px;
+  background: #fff;
+  text-align: right;
+}
+
+.shared-receipt-total span {
+  display: block;
+  color: #64748b;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.shared-receipt-total strong {
+  display: block;
+  margin-top: 4px;
+  color: #278b62;
+  font-size: clamp(1.7rem, 5vw, 2.5rem);
+}
+
+.shared-receipt-adjustments {
+  display: grid;
+  gap: 3px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.shared-receipt-adjustments small {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  color: #64748b;
+  font-size: 0.66rem;
+}
+
+.shared-receipt-adjustments small b {
+  color: #0f172a;
+}
+
+.shared-receipt-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 34px;
+}
+
+.shared-receipt-stats > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 13px 16px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.shared-receipt-stats strong {
+  font-size: 1.15rem;
+}
+
+.shared-receipt-stats span {
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.shared-receipt-section {
+  margin-top: 28px;
+}
+
+.shared-receipt-section-heading {
+  margin-bottom: 10px;
+}
+
+.shared-receipt-section-heading b {
+  display: grid;
+  min-width: 30px;
+  height: 26px;
+  place-items: center;
+  border-radius: 999px;
+  color: #278b62;
+  background: #e4f5ed;
+  font-size: 0.65rem;
+}
+
+.shared-receipt-items,
+.shared-receipt-payments,
+.shared-receipt-loading {
+  display: grid;
+  gap: 10px;
+}
+
+.shared-receipt-item,
+.shared-receipt-payment {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.045);
+}
+
+.shared-receipt-item {
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+}
+
+.shared-receipt-payment {
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+}
+
+.shared-receipt-number,
+.shared-receipt-payment > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  color: #073b2a;
+  background: #34d399;
+  font-weight: 900;
+}
+
+.shared-receipt-item > div {
+  min-width: 0;
+}
+
+.shared-receipt-item strong,
+.shared-receipt-item small {
+  display: block;
+}
+
+.shared-receipt-item small {
+  margin-top: 3px;
+  font-size: 0.68rem;
+}
+
+.shared-receipt-item p {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 0.78rem;
+}
+
+.shared-receipt-item > b,
+.shared-receipt-payment > b {
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.shared-receipt-footer {
+  gap: 14px;
+  margin-top: 34px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(15, 23, 42, 0.12);
+  font-size: 0.72rem;
+}
+
+.shared-receipt-footer a,
+.shared-receipt-error a {
+  padding: 11px 15px;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #f28a4b, #d9652e);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.shared-receipt-loading {
+  padding-top: 36px;
+}
+
+.shared-receipt-loading i {
+  height: 88px;
+  border-radius: 18px;
+  background: linear-gradient(90deg, #fff 25%, #e5eee9 50%, #fff 75%);
+  background-size: 200% 100%;
+  animation: shared-receipt-shimmer 1.3s linear infinite;
+}
+
+.shared-receipt-loading i:first-child {
+  height: 150px;
+}
+
+.shared-receipt-error {
+  max-width: 540px;
+  margin: 12vh auto 0;
+  padding: 32px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 24px;
+  background: #fff;
+  text-align: center;
+}
+
+.shared-receipt-error h1 {
+  margin: 8px 0;
+  font-size: clamp(1.8rem, 6vw, 3rem);
+}
+
+.shared-receipt-error p {
+  margin: 0 0 24px;
+  color: #64748b;
+}
+
+html[data-theme='dark'] .shared-receipt-page {
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at 92% 0%, rgba(52, 211, 153, 0.13), transparent 34%),
+    linear-gradient(rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+    #0f172a;
+  background-size: auto, 36px 36px, 36px 36px, auto;
+}
+
+html[data-theme='dark'] .shared-receipt-header,
+html[data-theme='dark'] .shared-receipt-footer {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html[data-theme='dark'] .shared-receipt-header > span,
+html[data-theme='dark'] .shared-receipt-section-heading b {
+  color: #6ee7b7;
+  background: rgba(52, 211, 153, 0.12);
+}
+
+html[data-theme='dark'] .shared-receipt-total,
+html[data-theme='dark'] .shared-receipt-stats > div,
+html[data-theme='dark'] .shared-receipt-item,
+html[data-theme='dark'] .shared-receipt-payment,
+html[data-theme='dark'] .shared-receipt-error {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #1e293b;
+  box-shadow: none;
+}
+
+html[data-theme='dark'] .shared-receipt-title p,
+html[data-theme='dark'] .shared-receipt-total span,
+html[data-theme='dark'] .shared-receipt-stats span,
+html[data-theme='dark'] .shared-receipt-item small,
+html[data-theme='dark'] .shared-receipt-item p,
+html[data-theme='dark'] .shared-receipt-footer > span,
+html[data-theme='dark'] .shared-receipt-error p {
+  color: #aab6c5;
+}
+
+html[data-theme='dark'] .shared-receipt-adjustments {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html[data-theme='dark'] .shared-receipt-adjustments small {
+  color: #aab6c5;
+}
+
+html[data-theme='dark'] .shared-receipt-adjustments small b {
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .shared-receipt-loading i {
+  background: linear-gradient(90deg, #1e293b 25%, #2c3b50 50%, #1e293b 75%);
+  background-size: 200% 100%;
+}
+
+@keyframes shared-receipt-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (max-width: 620px) {
+  .shared-receipt-title {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .shared-receipt-total {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .shared-receipt-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .shared-receipt-footer a {
+    text-align: center;
+  }
+
+  .shared-receipt-item,
+  .shared-receipt-payment {
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .shared-receipt-item {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+  }
+
+  .shared-receipt-number,
+  .shared-receipt-payment > span {
+    width: 34px;
+    height: 34px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shared-receipt-loading i {
+    animation: none;
+  }
+}
+
 .home-history-skeleton {
   display: flex;
   min-height: 0;

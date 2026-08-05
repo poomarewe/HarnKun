@@ -1,4 +1,5 @@
 import { lazy, StrictMode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { BitsButton, BitsSurface, ClickSpark } from './ReactBitsUI';
 import StaggeredMenu from './StaggeredMenu';
@@ -13,6 +14,7 @@ const loadAppStyles = () => {
 };
 
 const SHARE_HISTORY_URL = 'https://harn-kun.vercel.app/history';
+const historyQrCache = new Map();
 
 async function encodeSharedReceipt(record) {
   const friendIndexes = new Map(record.friends.map((friend, index) => [friend, index]));
@@ -27,6 +29,7 @@ async function encodeSharedReceipt(record) {
       (record.allocations[index] || []).map((friend) => friendIndexes.get(friend)).filter(Number.isInteger),
     ]),
     s: record.friends.map((friend) => Number(record.settlements.find((entry) => entry.name === friend)?.amount) || 0),
+    a: [record.vatEnabled ? Number(record.vatRate) || 0 : 0, record.discountEnabled ? Number(record.discountAmount) || 0 : 0],
     d: Number(record.updatedAt) || Date.now(),
   };
   const { gzipSync, strToU8 } = await import('fflate');
@@ -62,6 +65,10 @@ async function decodeSharedReceipt(value) {
     ? item[3].map((index) => friends[index]).filter(Boolean)
     : []);
   const settlements = friends.map((name, index) => ({ name, amount: Math.max(0, Number(compact.s?.[index]) || 0) }));
+  const subtotal = billItems.reduce((sum, item) => sum + item.amount, 0);
+  const vatRate = Math.max(0, Number(compact.a?.[0]) || 0);
+  const discountAmount = Math.max(0, Number(compact.a?.[1]) || 0);
+  const vatAmount = subtotal * vatRate / 100;
   return {
     id: `shared-${value.slice(0, 18)}`,
     eventName: compact.n,
@@ -69,11 +76,93 @@ async function decodeSharedReceipt(value) {
     billItems,
     allocations,
     settlements,
-    total: billItems.reduce((sum, item) => sum + item.amount, 0),
+    subtotal,
+    vatEnabled: vatRate > 0,
+    vatRate,
+    vatAmount,
+    discountEnabled: discountAmount > 0,
+    discountAmount,
+    total: Math.max(0, subtotal + vatAmount - discountAmount),
     createdAt: Number(compact.d) || Date.now(),
     updatedAt: Number(compact.d) || Date.now(),
     isShared: true,
   };
+}
+
+function BillShareQr({ record }) {
+  const cacheKey = `${record.id || record.eventName}-${record.updatedAt}-${record.total}`;
+  const [qrShare, setQrShare] = useState(() => historyQrCache.get(cacheKey) || null);
+  const [qrOpen, setQrOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cached = historyQrCache.get(cacheKey);
+    if (cached) {
+      setQrShare(cached);
+      return () => { cancelled = true; };
+    }
+
+    setQrShare(null);
+    const generateQr = async () => {
+      try {
+        const shareUrl = `${SHARE_HISTORY_URL}?r=${await encodeSharedReceipt(record)}`;
+        const { default: QRCode } = await import('qrcode');
+        const imageUrl = await QRCode.toDataURL(shareUrl, {
+          width: 512,
+          margin: 2,
+          errorCorrectionLevel: 'M',
+          color: { dark: '#0F172A', light: '#FFFFFF' },
+        });
+        const generatedShare = { shareUrl, imageUrl };
+        historyQrCache.set(cacheKey, generatedShare);
+        if (!cancelled) setQrShare(generatedShare);
+      } catch (qrError) {
+        console.error('Could not generate bill QR code:', qrError);
+      }
+    };
+    generateQr();
+
+    return () => { cancelled = true; };
+  }, [cacheKey, record]);
+
+  useEffect(() => {
+    if (!qrOpen) return undefined;
+    document.documentElement.classList.add('qr-preview-open');
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setQrOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.documentElement.classList.remove('qr-preview-open');
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [qrOpen]);
+
+  return (
+    <section className="history-share-qr" aria-label="Share this bill">
+      <strong>Scan to see full detail</strong>
+      {qrShare ? (
+        <button type="button" className="history-share-qr-button" onClick={() => setQrOpen(true)} aria-label="Enlarge this bill QR code">
+          <img src={qrShare.imageUrl} alt="QR code for this bill's read-only details" />
+        </button>
+      ) : (
+        <div className="history-share-qr-loading" role="status" aria-label="Generating QR code" />
+      )}
+      {qrOpen && qrShare && createPortal(
+        <div className="history-qr-modal-backdrop" role="presentation" onPointerDown={() => setQrOpen(false)}>
+          <section className="history-qr-modal" role="dialog" aria-modal="true" aria-label="Bill QR code" onPointerDown={(event) => event.stopPropagation()}>
+            <button type="button" className="history-qr-modal-close" onClick={() => setQrOpen(false)} aria-label="Close QR code">×</button>
+            <strong>Scan to see full detail</strong>
+            <a className="history-qr-modal-link" href={qrShare.shareUrl} target="_blank" rel="noreferrer" aria-label="Open the real read-only bill link">
+              <img src={qrShare.imageUrl} alt="Large QR code for this bill's read-only details" />
+            </a>
+            <a className="history-qr-open-link" href={qrShare.shareUrl} target="_blank" rel="noreferrer">Open bill detail ↗</a>
+          </section>
+        </div>,
+        document.body,
+      )}
+    </section>
+  );
 }
 
 const createAutomaticEventName = () => {
@@ -375,6 +464,7 @@ async function deleteHistoryRecord(recordId) {
 }
 
 function App() {
+  const isSharedHistoryRoute = window.location.pathname === '/history';
   const [silkReady, setSilkReady] = useState(false);
   const [theme, setTheme] = useState(() => {
     try {
@@ -396,6 +486,7 @@ function App() {
   const [menuOpenRequest, setMenuOpenRequest] = useState(0);
   const [homeHistorySwipe, setHomeHistorySwipe] = useState({ id: null, offset: 0, holding: false });
   const [removingHistoryId, setRemovingHistoryId] = useState(null);
+  const [historyDeleteInputLocked, setHistoryDeleteInputLocked] = useState(false);
   const [activeHistoryId, setActiveHistoryId] = useState(null);
   const [step, setStep] = useState('friends');
   const [eventName, setEventName] = useState('');
@@ -409,6 +500,10 @@ function App() {
   const [cropAspect, setCropAspect] = useState('16:9');
   const [isCropping, setIsCropping] = useState(false);
   const [billItems, setBillItems] = useState([]);
+  const [vatEnabled, setVatEnabled] = useState(false);
+  const [vatRate, setVatRate] = useState(7);
+  const [discountEnabled, setDiscountEnabled] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState(0);
   const [editingBillIndex, setEditingBillIndex] = useState(null);
   const [ocrStatus, setOcrStatus] = useState('idle');
   const [ocrProgress, setOcrProgress] = useState(0);
@@ -447,10 +542,13 @@ function App() {
     }
   }, [theme]);
 
-  const total = useMemo(
+  const subtotal = useMemo(
     () => billItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
     [billItems],
   );
+  const vatAmount = vatEnabled ? subtotal * Math.max(0, Number(vatRate) || 0) / 100 : 0;
+  const appliedDiscount = discountEnabled ? Math.max(0, Number(discountAmount) || 0) : 0;
+  const total = Math.max(0, subtotal + vatAmount - appliedDiscount);
 
   const sortedHistoryRecords = useMemo(() => {
     const records = [...historyRecords];
@@ -698,6 +796,10 @@ function App() {
     setCropTransform({ x: 0, y: 0, zoom: 1, rotation: 0 });
     setCropAspect('16:9');
     setBillItems([]);
+    setVatEnabled(false);
+    setVatRate(7);
+    setDiscountEnabled(false);
+    setDiscountAmount(0);
     setEditingBillIndex(null);
     setRawOcrText('');
     setOcrStatus('idle');
@@ -804,9 +906,12 @@ function App() {
   };
 
   useEffect(() => {
-    if (window.location.pathname !== '/history') return;
+    if (!isSharedHistoryRoute) return;
     const sharedValue = new URLSearchParams(window.location.search).get('r');
-    if (!sharedValue) return;
+    if (!sharedValue) {
+      setError('This shared bill link is missing its bill details.');
+      return;
+    }
 
     const openSharedReceipt = async () => {
       try {
@@ -815,7 +920,6 @@ function App() {
         setIsCreating(false);
         setSelectedHistory(sharedReceipt);
         setHistoryView('detail');
-        setMenuOpenRequest((request) => request + 1);
       } catch (sharedReceiptError) {
         console.error('Could not open shared receipt:', sharedReceiptError);
         setError('This shared receipt link is invalid or incomplete.');
@@ -841,14 +945,30 @@ function App() {
     setHomeHistorySwipe({ id: record.id, offset: 0, holding: false });
   };
 
-  const completeHeldHistoryDelete = async (swipe) => {
+  const completeHeldHistoryDelete = (swipe) => {
     if (homeHistorySwipeRef.current !== swipe || !swipe.holding || swipe.offset > -78) return;
     homeHistorySwipeRef.current = null;
+    setHistoryDeleteInputLocked(true);
+
+    let fallbackTimer;
+    const unlockAfterRelease = () => {
+      window.removeEventListener('pointerup', unlockAfterRelease, true);
+      window.removeEventListener('pointercancel', unlockAfterRelease, true);
+      window.clearTimeout(fallbackTimer);
+      window.setTimeout(() => setHistoryDeleteInputLocked(false), 80);
+    };
+    window.addEventListener('pointerup', unlockAfterRelease, { capture: true, once: true });
+    window.addEventListener('pointercancel', unlockAfterRelease, { capture: true, once: true });
+    fallbackTimer = window.setTimeout(unlockAfterRelease, 30000);
+    deleteHeldHistoryRecord(swipe.record);
+  };
+
+  const deleteHeldHistoryRecord = async (record) => {
     try {
-      setRemovingHistoryId(swipe.record.id);
+      setRemovingHistoryId(record.id);
       await new Promise((resolve) => window.setTimeout(resolve, 340));
-      await deleteHistoryRecord(swipe.record.id);
-      setHistoryRecords((records) => records.filter((item) => item.id !== swipe.record.id));
+      await deleteHistoryRecord(record.id);
+      setHistoryRecords((records) => records.filter((item) => item.id !== record.id));
     } catch (deleteError) {
       console.error('Could not delete history record:', deleteError);
       window.alert('Could not delete this bill. Please try again.');
@@ -1391,6 +1511,25 @@ function App() {
       });
     });
 
+    const assignedCents = Object.values(centsByFriend).reduce((sum, amount) => sum + amount, 0);
+    const targetCents = Math.round(total * 100);
+
+    if (assignedCents > 0 && targetCents !== assignedCents) {
+      const proportional = friends.map((friend) => ({
+        friend,
+        exact: centsByFriend[friend] * targetCents / assignedCents,
+      }));
+      let distributedCents = 0;
+      proportional.forEach((entry) => {
+        centsByFriend[entry.friend] = Math.floor(entry.exact);
+        distributedCents += centsByFriend[entry.friend];
+      });
+      proportional
+        .sort((left, right) => (right.exact - Math.floor(right.exact)) - (left.exact - Math.floor(left.exact)))
+        .slice(0, targetCents - distributedCents)
+        .forEach((entry) => { centsByFriend[entry.friend] += 1; });
+    }
+
     return friends.map((friend) => ({ name: friend, amount: centsByFriend[friend] / 100 }));
   };
 
@@ -1405,7 +1544,7 @@ function App() {
       const response = await fetch('/api/operations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventName, friends, billItems, allocations, settlements: calculatedSettlements, rawOcrText }),
+        body: JSON.stringify({ eventName, friends, billItems, allocations, settlements: calculatedSettlements, rawOcrText, subtotal, vatEnabled, vatRate, vatAmount, discountEnabled, discountAmount: appliedDiscount, total }),
       });
 
       if (!response.ok) throw new Error('Could not create the operation.');
@@ -1418,6 +1557,12 @@ function App() {
         billItems: billItems.map((item) => ({ ...item, quantity: Number(item.quantity) || 1, amount: Number(item.amount) || 0 })),
         allocations: allocations.map((names) => [...names]),
         settlements: calculatedSettlements.map((settlement) => ({ ...settlement })),
+        subtotal,
+        vatEnabled,
+        vatRate: Math.max(0, Number(vatRate) || 0),
+        vatAmount,
+        discountEnabled,
+        discountAmount: appliedDiscount,
         total,
         createdAt: now,
         updatedAt: now,
@@ -1499,6 +1644,10 @@ function App() {
         billItems: summaryBillItems,
         allocations: summaryAllocations,
         settlements: summarySettlements,
+        vatEnabled: savedRecord?.vatEnabled ?? vatEnabled,
+        vatRate: savedRecord?.vatRate ?? vatRate,
+        discountEnabled: savedRecord?.discountEnabled ?? discountEnabled,
+        discountAmount: savedRecord?.discountAmount ?? appliedDiscount,
         updatedAt: savedRecord?.updatedAt ?? Date.now(),
       };
       const shareUrl = `${SHARE_HISTORY_URL}?r=${await encodeSharedReceipt(shareRecord)}`;
@@ -1755,6 +1904,97 @@ function App() {
     }
   };
 
+  if (isSharedHistoryRoute) {
+    return (
+      <main className="shared-receipt-page">
+        <section className="shared-receipt-shell" aria-label="Shared bill details">
+          <header className="shared-receipt-header">
+            <a href="/" className="shared-receipt-brand" aria-label="Go to Harn Kun home">Harn Kun</a>
+            <span>READ ONLY</span>
+          </header>
+
+          {!selectedHistory?.isShared && !error && (
+            <div className="shared-receipt-loading" role="status" aria-label="Loading shared bill">
+              <i /><i /><i /><i />
+            </div>
+          )}
+
+          {!selectedHistory?.isShared && error && (
+            <div className="shared-receipt-error" role="alert">
+              <span>INVALID LINK</span>
+              <h1>Could not open this bill</h1>
+              <p>{error}</p>
+              <a href="/">Go to Harn Kun</a>
+            </div>
+          )}
+
+          {selectedHistory?.isShared && (
+            <article className="shared-receipt-detail">
+              <div className="shared-receipt-title">
+                <div>
+                  <span>SHARED BILL</span>
+                  <h1>{selectedHistory.eventName}</h1>
+                  <p>{new Date(selectedHistory.updatedAt).toLocaleString()}</p>
+                </div>
+                <div className="shared-receipt-total">
+                  <span>TOTAL</span>
+                  <strong>฿{Number(selectedHistory.total).toFixed(2)}</strong>
+                  {(selectedHistory.vatEnabled || selectedHistory.discountEnabled) && (
+                    <div className="shared-receipt-adjustments">
+                      <small>Subtotal <b>฿{Number(selectedHistory.subtotal).toFixed(2)}</b></small>
+                      {selectedHistory.vatEnabled && <small>VAT {Number(selectedHistory.vatRate)}% <b>+฿{Number(selectedHistory.vatAmount).toFixed(2)}</b></small>}
+                      {selectedHistory.discountEnabled && <small>Discount <b>−฿{Number(selectedHistory.discountAmount).toFixed(2)}</b></small>}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="shared-receipt-stats" aria-label="Bill summary">
+                <div><strong>{selectedHistory.friends.length}</strong><span>People</span></div>
+                <div><strong>{selectedHistory.billItems.length}</strong><span>Items</span></div>
+              </div>
+
+              <section className="shared-receipt-section">
+                <div className="shared-receipt-section-heading"><span>ITEMS & SHARING</span><b>{selectedHistory.billItems.length}</b></div>
+                <div className="shared-receipt-items">
+                  {selectedHistory.billItems.map((item, index) => (
+                    <article className="shared-receipt-item" key={`${item.name}-${index}`}>
+                      <span className="shared-receipt-number">{index + 1}</span>
+                      <div>
+                        <strong>{item.name}</strong>
+                        <small>Quantity {item.quantity}</small>
+                        <p>{(selectedHistory.allocations[index] || []).join(', ') || 'No people selected'}</p>
+                      </div>
+                      <b>฿{Number(item.amount).toFixed(2)}</b>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="shared-receipt-section">
+                <div className="shared-receipt-section-heading"><span>PAYMENT BREAKDOWN</span><b>{selectedHistory.settlements.length}</b></div>
+                <div className="shared-receipt-payments">
+                  {selectedHistory.settlements.map((settlement, index) => (
+                    <article className="shared-receipt-payment" key={`${settlement.name}-${index}`}>
+                      <span>{index + 1}</span>
+                      <strong>{settlement.name}</strong>
+                      <b>฿{Number(settlement.amount).toFixed(2)}</b>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <footer className="shared-receipt-footer">
+                <span>This bill is shared as read-only.</span>
+                <a href="/">Create a bill with Harn Kun</a>
+              </footer>
+            </article>
+          )}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <ClickSpark as="main" className="app">
       <div className="silk-background" aria-hidden="true">
@@ -1880,6 +2120,10 @@ function App() {
         </div>
         </section>
 
+        {historyDeleteInputLocked && (
+          <div className="history-delete-input-shield" aria-hidden="true" />
+        )}
+
         <BitsButton
           type="button"
           className="home-create-button"
@@ -1951,6 +2195,7 @@ function App() {
                 <BitsButton type="button" className="download-button history-download-button" onClick={() => downloadSummary(selectedHistory)}>
                   Download as picture
                 </BitsButton>
+                {!selectedHistory.isShared && <BillShareQr record={selectedHistory} />}
               </div>
             )}
           </div>
@@ -2169,6 +2414,30 @@ function App() {
                           })}
                           <BitsButton type="button" className="manual-item-button bill-list-add-button" onClick={addManualItem}>+ Add item manually</BitsButton>
                         </div>
+                        <BitsSurface className="bill-adjustments" aria-label="Bill adjustments">
+                          <div className={`bill-adjustment-row${vatEnabled ? ' is-enabled' : ''}`}>
+                            <label className="bill-adjustment-toggle">
+                              <input type="checkbox" checked={vatEnabled} onChange={(event) => setVatEnabled(event.target.checked)} />
+                              <span className="bill-adjustment-check" aria-hidden="true">✓</span>
+                              <span><strong>VAT</strong><small>Add tax to the subtotal</small></span>
+                            </label>
+                            <label className="bill-adjustment-input">
+                              <input aria-label="VAT percentage" type="number" min="0" max="100" step="0.01" inputMode="decimal" value={vatRate} disabled={!vatEnabled} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => setVatRate(event.target.value)} />
+                              <span>%</span>
+                            </label>
+                          </div>
+                          <div className={`bill-adjustment-row${discountEnabled ? ' is-enabled' : ''}`}>
+                            <label className="bill-adjustment-toggle">
+                              <input type="checkbox" checked={discountEnabled} onChange={(event) => setDiscountEnabled(event.target.checked)} />
+                              <span className="bill-adjustment-check" aria-hidden="true">✓</span>
+                              <span><strong>Discount</strong><small>Subtract a fixed amount</small></span>
+                            </label>
+                            <label className="bill-adjustment-input">
+                              <span>฿</span>
+                              <input aria-label="Discount in baht" type="number" min="0" step="0.01" inputMode="decimal" value={discountAmount} disabled={!discountEnabled} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => setDiscountAmount(event.target.value)} />
+                            </label>
+                          </div>
+                        </BitsSurface>
                       </>
                     )}
 
@@ -2187,7 +2456,15 @@ function App() {
                   <div className="bill-footer-actions">
                     {(ocrStatus === 'review' || billItems.length > 0) && (
                       <>
-                        <BitsSurface className="bill-total"><span>SUM</span><strong>฿{total.toFixed(2)}</strong></BitsSurface>
+                        <BitsSurface className="bill-total">
+                          <span>TOTAL</span>
+                          <div className="bill-total-breakdown">
+                            <small>Subtotal ฿{subtotal.toFixed(2)}</small>
+                            {vatEnabled && <small>VAT {Math.max(0, Number(vatRate) || 0)}% +฿{vatAmount.toFixed(2)}</small>}
+                            {discountEnabled && <small>Discount −฿{appliedDiscount.toFixed(2)}</small>}
+                          </div>
+                          <strong>฿{total.toFixed(2)}</strong>
+                        </BitsSurface>
                         <BitsButton className="save-button" type="button" disabled={!billItems.some((item) => item.name.trim())} onClick={startSplitting}>Confirm & split</BitsButton>
                       </>
                     )}
