@@ -14,6 +14,11 @@ const loadAppStyles = () => {
 };
 
 const SHARE_HISTORY_URL = 'https://harn-kun.vercel.app/history';
+const SHARE_QR_OPTIONS = {
+  margin: 2,
+  errorCorrectionLevel: 'M',
+  color: { dark: '#0F172A', light: '#FFFFFF' },
+};
 const historyQrCache = new Map();
 
 async function encodeSharedReceipt(record) {
@@ -108,10 +113,8 @@ function BillShareQr({ record }) {
         const shareUrl = `${SHARE_HISTORY_URL}?r=${await encodeSharedReceipt(record)}`;
         const { default: QRCode } = await import('qrcode');
         const imageUrl = await QRCode.toDataURL(shareUrl, {
+          ...SHARE_QR_OPTIONS,
           width: 512,
-          margin: 2,
-          errorCorrectionLevel: 'M',
-          color: { dark: '#0F172A', light: '#FFFFFF' },
         });
         const generatedShare = { shareUrl, imageUrl };
         historyQrCache.set(cacheKey, generatedShare);
@@ -1638,7 +1641,8 @@ function App() {
       const summaryAllocations = savedRecord?.allocations ?? allocations;
       const summarySettlements = savedRecord?.settlements ?? settlements;
       const summaryTotal = Number(savedRecord?.total ?? total);
-      const shareRecord = {
+      const storedShareRecord = savedRecord || historyRecords.find((record) => record.id === activeHistoryId);
+      const shareRecord = storedShareRecord || {
         eventName: summaryEventName,
         friends: savedRecord?.friends ?? friends,
         billItems: summaryBillItems,
@@ -1831,10 +1835,8 @@ function App() {
       const { default: QRCode } = await import('qrcode');
       const qrCanvas = document.createElement('canvas');
       await QRCode.toCanvas(qrCanvas, shareUrl, {
+        ...SHARE_QR_OPTIONS,
         width: 218,
-        margin: 2,
-        errorCorrectionLevel: 'L',
-        color: { dark: '#0F172A', light: '#FFFFFF' },
       });
       fillRoundedRect(64, qrTop, 952, 280, 28, exportColors.rowA, exportCardBorder);
       fillRoundedRect(82, qrTop + 15, 250, 250, 22, '#FFFFFF', 'rgba(15, 23, 42, 0.1)');
