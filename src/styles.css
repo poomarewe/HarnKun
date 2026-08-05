@@ -5844,6 +5844,39 @@ html[data-theme='dark'] .payer-option:not(.selected) small {
   color: #94a3b8;
 }
 
+/* Keep every light-mode payer state in the finance palette. */
+html[data-theme='finance'] .payer-option:not(.selected) {
+  border-color: rgba(100, 116, 139, 0.22);
+  color: #334155;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+html[data-theme='finance'] .payer-option:not(.selected) .payer-check {
+  border-color: #94a3b8;
+  color: transparent;
+  background: #f1f5f9;
+  box-shadow: none;
+}
+
+html[data-theme='finance'] .payer-option.selected {
+  border-color: #278b62;
+  color: #17324d;
+  background: #e4f5ed;
+  box-shadow: 0 10px 24px rgba(39, 139, 98, 0.12);
+}
+
+html[data-theme='finance'] .payer-option.selected .payer-check {
+  border-color: #278b62;
+  color: #073b2a;
+  background: #34d399;
+  box-shadow: 0 6px 16px rgba(52, 211, 153, 0.18);
+}
+
+html[data-theme='finance'] .payer-option.selected small {
+  color: #278b62;
+}
+
 .overlay.is-closing {
   pointer-events: none;
   animation: workflow-overlay-exit 280ms ease-in forwards;
@@ -6330,6 +6363,11 @@ html[data-theme='dark'] .bill-total-breakdown small {
 
   html .bill-item-shell.is-editing {
     overflow: visible;
+    background: transparent;
+  }
+
+  html .bill-item-shell.is-editing > .bill-swipe-underlay {
+    display: none;
   }
 
   html .bill-item-shell > .bill-item.bill-item-editor {
