@@ -498,6 +498,7 @@ function App() {
   const [friendName, setFriendName] = useState('');
   const [friends, setFriends] = useState([]);
   const [billImageUrl, setBillImageUrl] = useState('');
+  const [billPhotoOpen, setBillPhotoOpen] = useState(false);
   const [cameraFlow, setCameraFlow] = useState(null);
   const [pendingCameraUrl, setPendingCameraUrl] = useState('');
   const [cropBaseSize, setCropBaseSize] = useState({ width: 0, height: 0 });
@@ -546,6 +547,19 @@ function App() {
       // The theme still works when storage is unavailable.
     }
   }, [theme]);
+
+  useEffect(() => {
+    if (!billPhotoOpen) return undefined;
+    document.documentElement.classList.add('media-preview-open');
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setBillPhotoOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.documentElement.classList.remove('media-preview-open');
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [billPhotoOpen]);
 
   const subtotal = useMemo(
     () => billItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
@@ -795,6 +809,7 @@ function App() {
     if (billImageUrl) URL.revokeObjectURL(billImageUrl);
     if (pendingCameraUrl) URL.revokeObjectURL(pendingCameraUrl);
     setBillImageUrl('');
+    setBillPhotoOpen(false);
     setCameraFlow(null);
     setPendingCameraUrl('');
     setCropBaseSize({ width: 0, height: 0 });
@@ -2237,6 +2252,17 @@ function App() {
         )}
       </StaggeredMenu>
 
+      {billPhotoOpen && billImageUrl && createPortal(
+        <div className="bill-photo-modal-backdrop" role="presentation" onPointerDown={() => setBillPhotoOpen(false)}>
+          <section className="bill-photo-modal" role="dialog" aria-modal="true" aria-label="Bill photo preview" onPointerDown={(event) => event.stopPropagation()}>
+            <button type="button" className="bill-photo-modal-close" onClick={() => setBillPhotoOpen(false)} aria-label="Close bill photo">×</button>
+            <strong>Bill photo</strong>
+            <div><img src={billImageUrl} alt="Large preview of the selected bill" /></div>
+          </section>
+        </div>,
+        document.body,
+      )}
+
       {isCreating && (
         <div className={`overlay${isWorkflowClosing ? ' is-closing' : ''}`} role="presentation" onMouseDown={closePanel}>
           <BitsSurface as="section" className={`operation-panel step-${step}`} aria-label="New operation" onMouseDown={(event) => event.stopPropagation()}>
@@ -2348,7 +2374,9 @@ function App() {
 
                 {!cameraFlow && billImageUrl && (
                   <BitsSurface className={`bill-preview${ocrStatus === 'scanning' ? ' is-scanning' : ''}`}>
-                    <img src={billImageUrl} alt="Selected bill" />
+                    <button type="button" className="bill-preview-image-button" onClick={() => setBillPhotoOpen(true)} aria-label="View bill photo full screen">
+                      <img src={billImageUrl} alt="Selected bill" />
+                    </button>
                     <div><strong>{ocrStatus === 'scanning' ? 'Reading your bill…' : 'Bill photo'}</strong><span></span></div>
                     {ocrStatus !== 'scanning' && (
                       <BitsButton type="button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
@@ -2470,24 +2498,48 @@ function App() {
                     {(ocrStatus === 'review' || billItems.length > 0) && (
                       <>
                         <BitsSurface className="bill-adjustments" aria-label="Bill adjustments">
-                          <div className={`bill-adjustment-row${vatEnabled ? ' is-enabled' : ''}`}>
-                            <label className="bill-adjustment-toggle">
-                              <input type="checkbox" checked={vatEnabled} onChange={(event) => setVatEnabled(event.target.checked)} />
+                          <div
+                            className={`bill-adjustment-row${vatEnabled ? ' is-enabled' : ''}`}
+                            role="checkbox"
+                            aria-checked={vatEnabled}
+                            tabIndex="0"
+                            onClick={() => setVatEnabled((enabled) => !enabled)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                setVatEnabled((enabled) => !enabled);
+                              }
+                            }}
+                          >
+                            <div className="bill-adjustment-toggle">
+                              <input type="checkbox" checked={vatEnabled} readOnly tabIndex="-1" aria-hidden="true" />
                               <span className="bill-adjustment-check" aria-hidden="true">✓</span>
                               <span><strong>VAT</strong><small>Add tax to the subtotal</small></span>
-                            </label>
-                            <label className="bill-adjustment-input">
+                            </div>
+                            <label className="bill-adjustment-input" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => { event.stopPropagation(); if (!vatEnabled) setVatEnabled(true); }}>
                               <input aria-label="VAT percentage" type="number" min="0" max="100" step="0.01" inputMode="decimal" value={vatRate} disabled={!vatEnabled} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => setVatRate(event.target.value)} />
                               <span>%</span>
                             </label>
                           </div>
-                          <div className={`bill-adjustment-row${discountEnabled ? ' is-enabled' : ''}`}>
-                            <label className="bill-adjustment-toggle">
-                              <input type="checkbox" checked={discountEnabled} onChange={(event) => setDiscountEnabled(event.target.checked)} />
+                          <div
+                            className={`bill-adjustment-row${discountEnabled ? ' is-enabled' : ''}`}
+                            role="checkbox"
+                            aria-checked={discountEnabled}
+                            tabIndex="0"
+                            onClick={() => setDiscountEnabled((enabled) => !enabled)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                setDiscountEnabled((enabled) => !enabled);
+                              }
+                            }}
+                          >
+                            <div className="bill-adjustment-toggle">
+                              <input type="checkbox" checked={discountEnabled} readOnly tabIndex="-1" aria-hidden="true" />
                               <span className="bill-adjustment-check" aria-hidden="true">✓</span>
                               <span><strong>Discount</strong><small>Subtract a fixed amount</small></span>
-                            </label>
-                            <label className="bill-adjustment-input">
+                            </div>
+                            <label className="bill-adjustment-input" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => { event.stopPropagation(); if (!discountEnabled) setDiscountEnabled(true); }}>
                               <span>฿</span>
                               <input aria-label="Discount in baht" type="number" min="0" step="0.01" inputMode="decimal" value={discountAmount} disabled={!discountEnabled} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => setDiscountAmount(event.target.value)} />
                             </label>
