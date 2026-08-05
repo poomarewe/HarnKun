@@ -2,14 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 
 export default function StaggeredMenu({
   children,
-  canClearHistory = false,
-  onClearHistory,
-  onOpen,
+  openRequest = 0,
   onClose,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef(null);
   const panelRef = useRef(null);
+  const lastOpenRequestRef = useRef(openRequest);
 
   const closeMenu = () => {
     setIsOpen(false);
@@ -23,7 +22,6 @@ export default function StaggeredMenu({
       return;
     }
 
-    await onOpen?.();
     setIsOpen(true);
   };
 
@@ -42,6 +40,12 @@ export default function StaggeredMenu({
       window.clearTimeout(focusTimer);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (openRequest === lastOpenRequestRef.current) return;
+    lastOpenRequestRef.current = openRequest;
+    setIsOpen(true);
+  }, [openRequest]);
 
   return (
     <div className={`staggered-menu${isOpen ? ' is-open' : ''}`}>
@@ -77,26 +81,6 @@ export default function StaggeredMenu({
       >
         {children}
 
-        <div className="staggered-menu-footer-actions">
-          <a
-            className="staggered-menu-instagram"
-            href="https://www.instagram.com/https.sanin/"
-            target="_blank"
-            rel="noreferrer"
-            tabIndex={isOpen ? 0 : -1}
-          >
-            Instagram · @https.sanin
-          </a>
-          <button
-            className="staggered-menu-clear"
-            type="button"
-            disabled={!canClearHistory}
-            tabIndex={isOpen ? 0 : -1}
-            onClick={onClearHistory}
-          >
-            Clear history
-          </button>
-        </div>
       </aside>
     </div>
   );

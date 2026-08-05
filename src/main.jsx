@@ -1,8 +1,6 @@
 import { lazy, StrictMode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import HeroTitle from './HeroTitle';
 import { BitsButton, BitsSurface, ClickSpark } from './ReactBitsUI';
-import SpecularButton from './SpecularButton';
 import StaggeredMenu from './StaggeredMenu';
 import './critical.css';
 
@@ -13,6 +11,70 @@ const loadAppStyles = () => {
   if (!appStylesPromise) appStylesPromise = import('./styles.css');
   return appStylesPromise;
 };
+
+const SHARE_HISTORY_URL = 'https://harn-kun.vercel.app/history';
+
+async function encodeSharedReceipt(record) {
+  const friendIndexes = new Map(record.friends.map((friend, index) => [friend, index]));
+  const compactReceipt = {
+    v: 1,
+    n: record.eventName,
+    f: record.friends,
+    i: record.billItems.map((item, index) => [
+      item.name,
+      Number(item.quantity) || 1,
+      Number(item.amount) || 0,
+      (record.allocations[index] || []).map((friend) => friendIndexes.get(friend)).filter(Number.isInteger),
+    ]),
+    s: record.friends.map((friend) => Number(record.settlements.find((entry) => entry.name === friend)?.amount) || 0),
+    d: Number(record.updatedAt) || Date.now(),
+  };
+  const { gzipSync, strToU8 } = await import('fflate');
+  const bytes = gzipSync(strToU8(JSON.stringify(compactReceipt)), { level: 9 });
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return `z${btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')}`;
+}
+
+async function decodeSharedReceipt(value) {
+  const isCompressed = value.startsWith('z');
+  const encodedValue = isCompressed ? value.slice(1) : value;
+  const padded = encodedValue.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat((4 - encodedValue.length % 4) % 4);
+  const binary = atob(padded);
+  let bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  if (isCompressed) {
+    const { gunzipSync } = await import('fflate');
+    bytes = gunzipSync(bytes);
+  }
+  const compact = JSON.parse(new TextDecoder().decode(bytes));
+  if (compact.v !== 1 || typeof compact.n !== 'string' || !Array.isArray(compact.f) || !Array.isArray(compact.i)) {
+    throw new Error('Unsupported shared receipt.');
+  }
+  const friends = compact.f.map(String).slice(0, 100);
+  const billItems = compact.i.map(([name, quantity, amount]) => ({
+    name: String(name || ''),
+    quantity: Math.max(1, Number(quantity) || 1),
+    amount: Math.max(0, Number(amount) || 0),
+  })).filter((item) => item.name);
+  const allocations = compact.i.map((item) => Array.isArray(item[3])
+    ? item[3].map((index) => friends[index]).filter(Boolean)
+    : []);
+  const settlements = friends.map((name, index) => ({ name, amount: Math.max(0, Number(compact.s?.[index]) || 0) }));
+  return {
+    id: `shared-${value.slice(0, 18)}`,
+    eventName: compact.n,
+    friends,
+    billItems,
+    allocations,
+    settlements,
+    total: billItems.reduce((sum, item) => sum + item.amount, 0),
+    createdAt: Number(compact.d) || Date.now(),
+    updatedAt: Number(compact.d) || Date.now(),
+    isShared: true,
+  };
+}
 
 const createAutomaticEventName = () => {
   const dateTime = new Intl.DateTimeFormat(undefined, {
@@ -296,20 +358,56 @@ async function clearHistoryRecords() {
   });
 }
 
+async function deleteHistoryRecord(recordId) {
+  const database = await openHistoryDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(HISTORY_STORE, 'readwrite');
+    transaction.objectStore(HISTORY_STORE).delete(recordId);
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error);
+    };
+  });
+}
+
 function App() {
   const [silkReady, setSilkReady] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    try {
+      return window.localStorage.getItem('harn-kun-theme') === 'dark' ? 'dark' : 'finance';
+    } catch {
+      return 'finance';
+    }
+  });
   const [isCreating, setIsCreating] = useState(false);
+  const [isWorkflowClosing, setIsWorkflowClosing] = useState(false);
   const [hasActiveDraft, setHasActiveDraft] = useState(false);
   const [historyView, setHistoryView] = useState(null);
   const [historyRecords, setHistoryRecords] = useState([]);
   const [selectedHistory, setSelectedHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySort, setHistorySort] = useState('newest');
+  const [sortDrawerOpen, setSortDrawerOpen] = useState(false);
+  const [clearHistoryConfirmOpen, setClearHistoryConfirmOpen] = useState(false);
+  const [menuOpenRequest, setMenuOpenRequest] = useState(0);
+  const [homeHistorySwipe, setHomeHistorySwipe] = useState({ id: null, offset: 0, holding: false });
+  const [removingHistoryId, setRemovingHistoryId] = useState(null);
   const [activeHistoryId, setActiveHistoryId] = useState(null);
   const [step, setStep] = useState('friends');
   const [eventName, setEventName] = useState('');
   const [friendName, setFriendName] = useState('');
   const [friends, setFriends] = useState([]);
   const [billImageUrl, setBillImageUrl] = useState('');
+  const [cameraFlow, setCameraFlow] = useState(null);
+  const [pendingCameraUrl, setPendingCameraUrl] = useState('');
+  const [cropBaseSize, setCropBaseSize] = useState({ width: 0, height: 0 });
+  const [cropTransform, setCropTransform] = useState({ x: 0, y: 0, zoom: 1, rotation: 0 });
+  const [cropAspect, setCropAspect] = useState('16:9');
+  const [isCropping, setIsCropping] = useState(false);
   const [billItems, setBillItems] = useState([]);
   const [editingBillIndex, setEditingBillIndex] = useState(null);
   const [ocrStatus, setOcrStatus] = useState('idle');
@@ -324,14 +422,43 @@ function App() {
   const inputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const uploadInputRef = useRef(null);
+  const cropWorkspaceRef = useRef(null);
+  const cropFrameRef = useRef(null);
+  const cropImageRef = useRef(null);
+  const cropPointersRef = useRef(new Map());
+  const cropGestureRef = useRef(null);
+  const homeTitleTapRef = useRef(0);
+  const homeHistorySwipeRef = useRef(null);
+  const homeHistoryClickGuardRef = useRef(null);
+  const sortDrawerRef = useRef(null);
   const billSwipeRef = useRef(null);
   const billListRef = useRef(null);
   const billEditorRef = useRef(null);
+  const workflowCloseTimerRef = useRef(null);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0F172A' : '#F4F7F5');
+    try {
+      window.localStorage.setItem('harn-kun-theme', theme);
+    } catch {
+      // The theme still works when storage is unavailable.
+    }
+  }, [theme]);
 
   const total = useMemo(
     () => billItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
     [billItems],
   );
+
+  const sortedHistoryRecords = useMemo(() => {
+    const records = [...historyRecords];
+    if (historySort === 'oldest') return records.sort((a, b) => a.updatedAt - b.updatedAt);
+    if (historySort === 'highest') return records.sort((a, b) => Number(b.total) - Number(a.total));
+    if (historySort === 'lowest') return records.sort((a, b) => Number(a.total) - Number(b.total));
+    return records.sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [historyRecords, historySort]);
 
   useEffect(() => {
     let idleHandle;
@@ -368,6 +495,36 @@ function App() {
       window.clearTimeout(fallbackTimer);
     };
   }, []);
+
+  useEffect(() => () => {
+    window.clearTimeout(homeHistorySwipeRef.current?.holdTimer);
+    window.clearTimeout(workflowCloseTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!sortDrawerOpen) return undefined;
+    const closeOnOutsidePress = (event) => {
+      if (!sortDrawerRef.current?.contains(event.target)) setSortDrawerOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setSortDrawerOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePress);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [sortDrawerOpen]);
+
+  useEffect(() => {
+    if (!clearHistoryConfirmOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape' && !historyLoading) setClearHistoryConfirmOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [clearHistoryConfirmOpen, historyLoading]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -474,6 +631,20 @@ function App() {
   }, [isCreating, step]);
 
   useEffect(() => {
+    let active = true;
+    setHistoryLoading(true);
+    readHistoryRecords()
+      .then((records) => {
+        if (active) setHistoryRecords(records);
+      })
+      .catch((historyError) => console.error('Could not load recent bills:', historyError))
+      .finally(() => {
+        if (active) setHistoryLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     if (editingBillIndex === null) return undefined;
 
     const scrollEditorToBottom = () => {
@@ -504,9 +675,28 @@ function App() {
     if (billImageUrl) URL.revokeObjectURL(billImageUrl);
   }, [billImageUrl]);
 
+  useEffect(() => () => {
+    if (pendingCameraUrl) URL.revokeObjectURL(pendingCameraUrl);
+  }, [pendingCameraUrl]);
+
+  const closeCameraFlow = () => {
+    setCameraFlow(null);
+    setPendingCameraUrl('');
+    setCropBaseSize({ width: 0, height: 0 });
+    setCropTransform({ x: 0, y: 0, zoom: 1, rotation: 0 });
+    setCropAspect('16:9');
+    setIsCropping(false);
+  };
+
   const resetBill = () => {
     if (billImageUrl) URL.revokeObjectURL(billImageUrl);
+    if (pendingCameraUrl) URL.revokeObjectURL(pendingCameraUrl);
     setBillImageUrl('');
+    setCameraFlow(null);
+    setPendingCameraUrl('');
+    setCropBaseSize({ width: 0, height: 0 });
+    setCropTransform({ x: 0, y: 0, zoom: 1, rotation: 0 });
+    setCropAspect('16:9');
     setBillItems([]);
     setEditingBillIndex(null);
     setRawOcrText('');
@@ -515,24 +705,31 @@ function App() {
   };
 
   const openPanel = async () => {
-    await loadAppStyles();
+    window.clearTimeout(workflowCloseTimerRef.current);
+    setIsWorkflowClosing(false);
+    setSortDrawerOpen(false);
     setHistoryView(null);
     setSelectedHistory(null);
-    setActiveHistoryId(null);
 
-    if (!hasActiveDraft) {
-      setStep('friends');
-      setEventName(createAutomaticEventName());
-      setFriendName('');
-      setFriends([]);
-      setAllocations([]);
-      setSplitIndex(0);
-      setSettlements([]);
-      resetBill();
-      setError('');
-      setHasActiveDraft(true);
+    // A draft already loaded the workflow styles. Reopen it immediately and
+    // preserve its current step, inputs, scan review, and history metadata.
+    if (hasActiveDraft) {
+      setIsCreating(true);
+      return;
     }
 
+    await loadAppStyles();
+    setActiveHistoryId(null);
+    setStep('friends');
+    setEventName(createAutomaticEventName());
+    setFriendName('');
+    setFriends([]);
+    setAllocations([]);
+    setSplitIndex(0);
+    setSettlements([]);
+    resetBill();
+    setError('');
+    setHasActiveDraft(true);
     setIsCreating(true);
   };
 
@@ -559,14 +756,17 @@ function App() {
 
   const clearHistory = async () => {
     if (historyRecords.length === 0) return;
-    if (!window.confirm('Clear all history stored on this device?')) return;
+    setClearHistoryConfirmOpen(true);
+  };
 
+  const confirmClearHistory = async () => {
     setHistoryLoading(true);
     try {
       await clearHistoryRecords();
       setHistoryRecords([]);
       setSelectedHistory(null);
       setHistoryView('list');
+      setClearHistoryConfirmOpen(false);
     } catch (historyError) {
       console.error('Could not clear local history:', historyError);
       window.alert('Could not clear history. Please try again.');
@@ -576,12 +776,189 @@ function App() {
   };
 
   const closePanel = () => {
-    if (!isSaving && ocrStatus !== 'scanning') setIsCreating(false);
+    if (!isSaving && ocrStatus !== 'scanning' && !isWorkflowClosing) {
+      if (cameraFlow) closeCameraFlow();
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        setIsCreating(false);
+        return;
+      }
+      setIsWorkflowClosing(true);
+      window.clearTimeout(workflowCloseTimerRef.current);
+      workflowCloseTimerRef.current = window.setTimeout(() => {
+        setIsCreating(false);
+        setIsWorkflowClosing(false);
+      }, 280);
+    }
+  };
+
+  const openHomeHistoryRecord = async (record) => {
+    if (homeHistoryClickGuardRef.current === record.id) {
+      homeHistoryClickGuardRef.current = null;
+      return;
+    }
+    setSortDrawerOpen(false);
+    await loadAppStyles();
+    setSelectedHistory(record);
+    setHistoryView('detail');
+    setMenuOpenRequest((request) => request + 1);
+  };
+
+  useEffect(() => {
+    if (window.location.pathname !== '/history') return;
+    const sharedValue = new URLSearchParams(window.location.search).get('r');
+    if (!sharedValue) return;
+
+    const openSharedReceipt = async () => {
+      try {
+        const sharedReceipt = await decodeSharedReceipt(sharedValue);
+        await loadAppStyles();
+        setIsCreating(false);
+        setSelectedHistory(sharedReceipt);
+        setHistoryView('detail');
+        setMenuOpenRequest((request) => request + 1);
+      } catch (sharedReceiptError) {
+        console.error('Could not open shared receipt:', sharedReceiptError);
+        setError('This shared receipt link is invalid or incomplete.');
+      }
+    };
+    openSharedReceipt();
+  }, []);
+
+  const beginHomeHistorySwipe = (event, record) => {
+    window.clearTimeout(homeHistorySwipeRef.current?.holdTimer);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    homeHistorySwipeRef.current = {
+      id: record.id,
+      record,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      offset: 0,
+      moved: false,
+      holding: false,
+      holdTimer: null,
+    };
+    setHomeHistorySwipe({ id: record.id, offset: 0, holding: false });
+  };
+
+  const completeHeldHistoryDelete = async (swipe) => {
+    if (homeHistorySwipeRef.current !== swipe || !swipe.holding || swipe.offset > -78) return;
+    homeHistorySwipeRef.current = null;
+    try {
+      setRemovingHistoryId(swipe.record.id);
+      await new Promise((resolve) => window.setTimeout(resolve, 340));
+      await deleteHistoryRecord(swipe.record.id);
+      setHistoryRecords((records) => records.filter((item) => item.id !== swipe.record.id));
+    } catch (deleteError) {
+      console.error('Could not delete history record:', deleteError);
+      window.alert('Could not delete this bill. Please try again.');
+    } finally {
+      setRemovingHistoryId(null);
+      setHomeHistorySwipe({ id: null, offset: 0, holding: false });
+    }
+  };
+
+  const moveHomeHistorySwipe = (event) => {
+    const swipe = homeHistorySwipeRef.current;
+    if (!swipe || swipe.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - swipe.startX;
+    const deltaY = event.clientY - swipe.startY;
+    if (!swipe.moved && Math.abs(deltaY) > Math.abs(deltaX)) return;
+    if (Math.abs(deltaX) > 8) swipe.moved = true;
+    swipe.offset = Math.max(-112, Math.min(0, deltaX));
+    if (swipe.offset <= -78 && !swipe.holding) {
+      swipe.holding = true;
+      swipe.holdTimer = window.setTimeout(() => completeHeldHistoryDelete(swipe), 1800);
+    } else if (swipe.offset > -78 && swipe.holding) {
+      window.clearTimeout(swipe.holdTimer);
+      swipe.holding = false;
+      swipe.holdTimer = null;
+    }
+    setHomeHistorySwipe({ id: swipe.id, offset: swipe.offset, holding: swipe.holding });
+  };
+
+  const finishHomeHistorySwipe = (event, record) => {
+    const swipe = homeHistorySwipeRef.current;
+    if (!swipe || swipe.pointerId !== event.pointerId) return;
+    window.clearTimeout(swipe.holdTimer);
+    homeHistorySwipeRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (swipe.moved) {
+      homeHistoryClickGuardRef.current = record.id;
+      window.setTimeout(() => {
+        if (homeHistoryClickGuardRef.current === record.id) homeHistoryClickGuardRef.current = null;
+      }, 500);
+    }
+
+    setHomeHistorySwipe({ id: null, offset: 0, holding: false });
+  };
+
+  const cancelHomeHistorySwipe = (event) => {
+    const swipe = homeHistorySwipeRef.current;
+    if (!swipe || swipe.pointerId !== event.pointerId) return;
+    window.clearTimeout(swipe.holdTimer);
+    homeHistorySwipeRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    setHomeHistorySwipe({ id: null, offset: 0, holding: false });
+  };
+
+  const addRandomSampleBills = async () => {
+    const eventNames = ['Weekend Trip', 'Shared Apartment', 'Birthday Party', 'Team Outing', 'Monthly Utilities', 'Movie Night', 'Road Trip', 'Group Booking', 'House Supplies', 'Shared Purchase'];
+    const friendPool = ['Mook', 'Beam', 'Nan', 'Palm', 'Ice', 'Ploy', 'Boss', 'Mint'];
+    const foodPool = [
+      ['Taxi fare', 180], ['Hotel room', 1200], ['Movie tickets', 480], ['Internet bill', 650],
+      ['Electricity', 920], ['Groceries', 740], ['Parking', 120], ['Event tickets', 900],
+      ['Shared supplies', 350], ['Delivery fee', 80], ['Rental fee', 500], ['Service charge', 150],
+    ];
+    const now = Date.now();
+    const randomRecords = Array.from({ length: 10 }, (_, recordIndex) => {
+      const friends = [...friendPool].sort(() => Math.random() - 0.5).slice(0, 2 + Math.floor(Math.random() * 4));
+      const billItems = [...foodPool]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 2 + Math.floor(Math.random() * 4))
+        .map(([name, baseAmount]) => ({ name, quantity: 1, amount: baseAmount + Math.floor(Math.random() * 4) * 5 }));
+      const allocations = billItems.map(() => {
+        const selected = friends.filter(() => Math.random() > 0.38);
+        return selected.length > 0 ? selected : [friends[Math.floor(Math.random() * friends.length)]];
+      });
+      const centsByFriend = Object.fromEntries(friends.map((friend) => [friend, 0]));
+      billItems.forEach((item, itemIndex) => {
+        const selected = allocations[itemIndex];
+        const itemCents = Math.round(item.amount * 100);
+        const baseShare = Math.floor(itemCents / selected.length);
+        const remainder = itemCents % selected.length;
+        selected.forEach((friend, friendIndex) => {
+          centsByFriend[friend] += baseShare + (friendIndex < remainder ? 1 : 0);
+        });
+      });
+      const updatedAt = now - recordIndex * 86_400_000 - Math.floor(Math.random() * 43_200_000);
+      return {
+        id: `sample-${updatedAt}-${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`,
+        eventName: eventNames[recordIndex],
+        friends,
+        billItems,
+        allocations,
+        settlements: friends.map((name) => ({ name, amount: centsByFriend[name] / 100 })),
+        total: billItems.reduce((sum, item) => sum + item.amount, 0),
+        createdAt: updatedAt,
+        updatedAt,
+      };
+    });
+
+    await Promise.all(randomRecords.map(saveHistoryRecord));
+    setHistoryRecords((records) => [...randomRecords, ...records].sort((a, b) => b.updatedAt - a.updatedAt));
+  };
+
+  const handleHomeTitleTap = () => {
+    homeTitleTapRef.current += 1;
+    if (homeTitleTapRef.current < 13) return;
+    homeTitleTapRef.current = 0;
+    addRandomSampleBills().catch((sampleError) => console.error('Could not add sample bills:', sampleError));
   };
 
   const finishOperation = () => {
-    setIsCreating(false);
     setHasActiveDraft(false);
+    closePanel();
   };
 
   const addFriend = (event) => {
@@ -590,7 +967,7 @@ function App() {
 
     if (!name) return;
     if (friends.length >= 100) {
-      setError('You can add up to 100 friends.');
+      setError('You can add up to 100 people.');
       return;
     }
     if (friends.some((friend) => friend.toLocaleLowerCase() === name.toLocaleLowerCase())) {
@@ -677,7 +1054,7 @@ function App() {
       setEditingBillIndex(null);
       setOcrStatus('review');
       if (detectedItems.length === 0) {
-        setError('No food rows were detected. Add them manually or try a clearer photo.');
+        setError('No bill items were detected. Add them manually or try a clearer photo.');
       }
     } catch (scanError) {
       setOcrStatus('idle');
@@ -688,10 +1065,215 @@ function App() {
     }
   };
 
+  const openBillCropEditor = (file, source) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image of the bill.');
+      return;
+    }
+
+    if (pendingCameraUrl) URL.revokeObjectURL(pendingCameraUrl);
+    setPendingCameraUrl(URL.createObjectURL(file));
+    setCropBaseSize({ width: 0, height: 0 });
+    setCropTransform({ x: 0, y: 0, zoom: 1, rotation: 0 });
+    setCropAspect('16:9');
+    setCameraFlow(source);
+    setError('');
+  };
+
   const chooseBill = (event) => {
     const [file] = event.target.files;
     event.target.value = '';
-    scanBill(file);
+    openBillCropEditor(file, 'upload');
+  };
+
+  const startCameraFlow = () => {
+    setError('');
+    cameraInputRef.current?.click();
+  };
+
+  const chooseCameraBill = (event) => {
+    const [file] = event.target.files;
+    event.target.value = '';
+    openBillCropEditor(file, 'camera');
+  };
+
+  const initializeCropEditor = () => {
+    const image = cropImageRef.current;
+    const frame = cropFrameRef.current;
+    const workspace = cropWorkspaceRef.current;
+    if (!image || !frame || !workspace || !image.naturalWidth || !image.naturalHeight) return;
+    const workspaceRect = workspace.getBoundingClientRect();
+    const scale = Math.max(workspaceRect.width / image.naturalWidth, workspaceRect.height / image.naturalHeight);
+    setCropBaseSize({ width: image.naturalWidth * scale, height: image.naturalHeight * scale });
+    setCropTransform({ x: 0, y: 0, zoom: 1, rotation: 0 });
+  };
+
+  const clampCropTransform = (nextTransform) => {
+    const frame = cropFrameRef.current;
+    if (!frame || !cropBaseSize.width || !cropBaseSize.height) return nextTransform;
+    const quarterTurn = Math.abs(nextTransform.rotation % 180) === 90;
+    const transformedWidth = (quarterTurn ? cropBaseSize.height : cropBaseSize.width) * nextTransform.zoom;
+    const transformedHeight = (quarterTurn ? cropBaseSize.width : cropBaseSize.height) * nextTransform.zoom;
+    const frameRect = frame.getBoundingClientRect();
+    const minimumZoom = Math.max(
+      0.1,
+      frameRect.width / (quarterTurn ? cropBaseSize.height : cropBaseSize.width),
+      frameRect.height / (quarterTurn ? cropBaseSize.width : cropBaseSize.height),
+    );
+    const zoom = Math.max(minimumZoom, Math.min(4, nextTransform.zoom));
+    const widthAtZoom = transformedWidth * (zoom / nextTransform.zoom);
+    const heightAtZoom = transformedHeight * (zoom / nextTransform.zoom);
+    const maxX = Math.max(0, (widthAtZoom - frameRect.width) / 2);
+    const maxY = Math.max(0, (heightAtZoom - frameRect.height) / 2);
+    return {
+      ...nextTransform,
+      zoom,
+      x: Math.max(-maxX, Math.min(maxX, nextTransform.x)),
+      y: Math.max(-maxY, Math.min(maxY, nextTransform.y)),
+    };
+  };
+
+  const beginCropDrag = (event) => {
+    if (!cropBaseSize.width) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const pointers = cropPointersRef.current;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (pointers.size === 1) {
+      cropGestureRef.current = {
+        mode: 'drag',
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        imageX: cropTransform.x,
+        imageY: cropTransform.y,
+      };
+    } else if (pointers.size === 2) {
+      const [first, second] = [...pointers.values()];
+      cropGestureRef.current = {
+        mode: 'pinch',
+        startDistance: Math.hypot(second.x - first.x, second.y - first.y),
+        startMidX: (first.x + second.x) / 2,
+        startMidY: (first.y + second.y) / 2,
+        imageX: cropTransform.x,
+        imageY: cropTransform.y,
+        zoom: cropTransform.zoom,
+      };
+    }
+  };
+
+  const moveCropDrag = (event) => {
+    const pointers = cropPointersRef.current;
+    if (!pointers.has(event.pointerId)) return;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const gesture = cropGestureRef.current;
+    if (!gesture) return;
+
+    if (gesture.mode === 'drag' && gesture.pointerId === event.pointerId) {
+      setCropTransform((current) => clampCropTransform({
+        ...current,
+        x: gesture.imageX + event.clientX - gesture.startX,
+        y: gesture.imageY + event.clientY - gesture.startY,
+      }));
+    } else if (gesture.mode === 'pinch' && pointers.size >= 2) {
+      const [first, second] = [...pointers.values()];
+      const distance = Math.max(1, Math.hypot(second.x - first.x, second.y - first.y));
+      const midX = (first.x + second.x) / 2;
+      const midY = (first.y + second.y) / 2;
+      setCropTransform((current) => clampCropTransform({
+        ...current,
+        zoom: gesture.zoom * (distance / Math.max(1, gesture.startDistance)),
+        x: gesture.imageX + midX - gesture.startMidX,
+        y: gesture.imageY + midY - gesture.startMidY,
+      }));
+    }
+  };
+
+  const zoomCropWithWheel = (event) => {
+    if (!cropBaseSize.width || !cropWorkspaceRef.current) return;
+    event.preventDefault();
+    const workspaceRect = cropWorkspaceRef.current.getBoundingClientRect();
+    const pointerX = event.clientX - (workspaceRect.left + workspaceRect.width / 2);
+    const pointerY = event.clientY - (workspaceRect.top + workspaceRect.height / 2);
+
+    setCropTransform((current) => {
+      const nextZoom = Math.max(0.25, Math.min(4, current.zoom * Math.exp(-event.deltaY * 0.0015)));
+      const zoomRatio = nextZoom / current.zoom;
+      return clampCropTransform({
+        ...current,
+        zoom: nextZoom,
+        x: pointerX - (pointerX - current.x) * zoomRatio,
+        y: pointerY - (pointerY - current.y) * zoomRatio,
+      });
+    });
+  };
+
+  const toggleCropAspect = () => {
+    setCropAspect((current) => current === '16:9' ? '9:16' : '16:9');
+    window.requestAnimationFrame(() => {
+      setCropTransform((current) => clampCropTransform(current));
+    });
+  };
+
+  const endCropDrag = (event) => {
+    const pointers = cropPointersRef.current;
+    pointers.delete(event.pointerId);
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (pointers.size === 1) {
+      const [pointerId, point] = [...pointers.entries()][0];
+      cropGestureRef.current = {
+        mode: 'drag',
+        pointerId,
+        startX: point.x,
+        startY: point.y,
+        imageX: cropTransform.x,
+        imageY: cropTransform.y,
+      };
+    } else {
+      cropGestureRef.current = null;
+    }
+  };
+
+  const confirmCameraBill = async () => {
+    const image = cropImageRef.current;
+    const workspace = cropWorkspaceRef.current;
+    const frame = cropFrameRef.current;
+    if (!image || !workspace || !frame || !cropBaseSize.width || isCropping) return;
+
+    setIsCropping(true);
+    try {
+      const workspaceRect = workspace.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      const exportScale = Math.min(4, Math.max(2, 1600 / frameRect.width));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(frameRect.width * exportScale);
+      canvas.height = Math.round(frameRect.height * exportScale);
+      const context = canvas.getContext('2d', { alpha: false });
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.scale(exportScale, exportScale);
+      context.translate(
+        workspaceRect.width / 2 - (frameRect.left - workspaceRect.left) + cropTransform.x,
+        workspaceRect.height / 2 - (frameRect.top - workspaceRect.top) + cropTransform.y,
+      );
+      context.rotate((cropTransform.rotation * Math.PI) / 180);
+      context.scale(cropTransform.zoom, cropTransform.zoom);
+      context.drawImage(
+        image,
+        -cropBaseSize.width / 2,
+        -cropBaseSize.height / 2,
+        cropBaseSize.width,
+        cropBaseSize.height,
+      );
+      const blob = await canvasToJpeg(canvas, 0.92);
+      const croppedFile = new File([blob], `bill-crop-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
+      closeCameraFlow();
+      scanBill(croppedFile);
+    } catch {
+      setError('Could not crop this photo. Please try again.');
+      setIsCropping(false);
+    }
   };
 
   const updateBillItem = (index, field, value) => {
@@ -762,7 +1344,7 @@ function App() {
   const startSplitting = () => {
     const cleanItems = billItems.filter((item) => item.name.trim());
     if (cleanItems.length === 0) {
-      setError('Add at least one food item before splitting.');
+      setError('Add at least one bill item before splitting.');
       return;
     }
 
@@ -844,6 +1426,7 @@ function App() {
       try {
         await saveHistoryRecord(historyRecord);
         setActiveHistoryId(historyId);
+        setHistoryRecords((records) => [historyRecord, ...records.filter((record) => record.id !== historyId)]);
       } catch (historyError) {
         console.error('Could not save local history:', historyError);
       }
@@ -861,7 +1444,7 @@ function App() {
 
   const goToNextFood = () => {
     if ((allocations[splitIndex] || []).length === 0) {
-      setError('Choose at least one person for this food.');
+      setError('Choose at least one person for this item.');
       return;
     }
     if (splitIndex === billItems.length - 1) {
@@ -883,9 +1466,11 @@ function App() {
     setError('');
 
     if (step === 'friends') {
-      setIsCreating(false);
+      closePanel();
     } else if (step === 'bill') {
-      if (billImageUrl || ocrStatus === 'review' || billItems.length > 0) {
+      if (cameraFlow) {
+        closeCameraFlow();
+      } else if (billImageUrl || ocrStatus === 'review' || billItems.length > 0) {
         resetBill();
       } else {
         setStep('friends');
@@ -908,6 +1493,15 @@ function App() {
       const summaryAllocations = savedRecord?.allocations ?? allocations;
       const summarySettlements = savedRecord?.settlements ?? settlements;
       const summaryTotal = Number(savedRecord?.total ?? total);
+      const shareRecord = {
+        eventName: summaryEventName,
+        friends: savedRecord?.friends ?? friends,
+        billItems: summaryBillItems,
+        allocations: summaryAllocations,
+        settlements: summarySettlements,
+        updatedAt: savedRecord?.updatedAt ?? Date.now(),
+      };
+      const shareUrl = `${SHARE_HISTORY_URL}?r=${await encodeSharedReceipt(shareRecord)}`;
 
       // Wait for the web font before measuring. Safari otherwise occasionally
       // measures with its fallback font and draws with the loaded font.
@@ -942,13 +1536,44 @@ function App() {
       });
       const foodSectionHeight = foodLayouts.reduce((sum, layout) => sum + layout.height + 14, 0);
       const settlementSectionHeight = summarySettlements.length * 94;
-      const height = Math.max(1200, 550 + foodSectionHeight + settlementSectionHeight);
+      const qrTop = 508 + foodSectionHeight + settlementSectionHeight;
+      const height = Math.max(1050, qrTop + 360);
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
       const context = canvas.getContext('2d');
+      const isDarkExport = theme === 'dark';
+      const exportColors = isDarkExport ? {
+        backgroundStart: '#0F172A',
+        backgroundMiddle: '#142033',
+        backgroundEnd: '#0F172A',
+        glowStart: 'rgba(52, 211, 153, 0.18)',
+        glowEnd: 'rgba(52, 211, 153, 0)',
+        primary: '#34D399',
+        primaryText: '#0F172A',
+        text: '#F8FAFC',
+        subtext: '#CBD5E1',
+        summary: '#1E293B',
+        rowA: '#1E293B',
+        rowB: '#243247',
+        footer: '#94A3B8',
+      } : {
+        backgroundStart: '#F4F7F5',
+        backgroundMiddle: '#E6EFEA',
+        backgroundEnd: '#F4F7F5',
+        glowStart: 'rgba(66, 184, 131, 0.2)',
+        glowEnd: 'rgba(66, 184, 131, 0)',
+        primary: '#42B883',
+        primaryText: '#0F172A',
+        text: '#0F172A',
+        subtext: '#475569',
+        summary: '#FFFFFF',
+        rowA: '#FFFFFF',
+        rowB: '#EEF6F2',
+        footer: '#475569',
+      };
 
-      const fillRoundedRect = (x, y, rectWidth, rectHeight, radius, fillStyle) => {
+      const fillRoundedRect = (x, y, rectWidth, rectHeight, radius, fillStyle, strokeStyle = null) => {
         context.fillStyle = fillStyle;
         context.beginPath();
         if (typeof context.roundRect === 'function') {
@@ -962,6 +1587,11 @@ function App() {
           context.closePath();
         }
         context.fill();
+        if (strokeStyle) {
+          context.strokeStyle = strokeStyle;
+          context.lineWidth = 1;
+          context.stroke();
+        }
       };
 
       // Avoid canvas textAlign="right": WebKit can position Thai/currency text
@@ -974,55 +1604,57 @@ function App() {
       };
 
       const gradient = context.createLinearGradient(0, 0, width, height);
-      gradient.addColorStop(0, '#18122B');
-      gradient.addColorStop(0.55, '#393053');
-      gradient.addColorStop(1, '#18122B');
+      gradient.addColorStop(0, exportColors.backgroundStart);
+      gradient.addColorStop(0.55, exportColors.backgroundMiddle);
+      gradient.addColorStop(1, exportColors.backgroundEnd);
       context.fillStyle = gradient;
       context.fillRect(0, 0, width, height);
 
       const glow = context.createRadialGradient(900, 20, 0, 900, 20, 650);
-      glow.addColorStop(0, 'rgba(99, 89, 133, 0.34)');
-      glow.addColorStop(1, 'rgba(99, 89, 133, 0)');
+      glow.addColorStop(0, exportColors.glowStart);
+      glow.addColorStop(1, exportColors.glowEnd);
       context.fillStyle = glow;
       context.fillRect(0, 0, width, 700);
 
-      context.fillStyle = '#635985';
+      context.fillStyle = exportColors.primary;
       context.font = '800 34px "Noto Sans Thai", sans-serif';
       context.fillText('หารกัน', 72, 82);
-      context.fillStyle = '#ffffff';
+      context.fillStyle = exportColors.text;
       context.font = '800 64px "Noto Sans Thai", sans-serif';
       context.fillText(summaryEventName, 72, 162, 936);
 
-      fillRoundedRect(72, 202, 936, 102, 25, 'rgba(99, 89, 133, 0.42)');
-      context.fillStyle = 'rgba(255, 255, 255, 0.72)';
+      const exportCardBorder = isDarkExport ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)';
+
+      fillRoundedRect(72, 202, 936, 102, 25, exportColors.summary, exportCardBorder);
+      context.fillStyle = exportColors.subtext;
       context.font = '700 25px "Noto Sans Thai", sans-serif';
       context.fillText('ยอดรวมทั้งหมด', 104, 242);
-      context.fillStyle = '#ffffff';
+      context.fillStyle = exportColors.text;
       context.font = '800 44px "Noto Sans Thai", sans-serif';
       fillTextFromRight(`฿${summaryTotal.toFixed(2)}`, 974, 270, 480);
 
-      context.fillStyle = 'rgba(255, 255, 255, 0.72)';
+      context.fillStyle = exportColors.subtext;
       context.font = '800 25px "Noto Sans Thai", sans-serif';
-      context.fillText(`รายการอาหาร · ${summaryBillItems.length} รายการ`, 74, 358);
+      context.fillText(`รายการค่าใช้จ่าย · ${summaryBillItems.length} รายการ`, 74, 358);
 
       let currentY = 388;
       foodLayouts.forEach(({ item, payerLines, height: rowHeight }, index) => {
-        fillRoundedRect(64, currentY, 952, rowHeight, 24, index % 2 === 0 ? '#393053' : '#443C68');
+        fillRoundedRect(64, currentY, 952, rowHeight, 24, index % 2 === 0 ? exportColors.rowA : exportColors.rowB, exportCardBorder);
 
-        fillRoundedRect(88, currentY + 24, 48, 48, 15, '#635985');
-        context.fillStyle = '#ffffff';
+        fillRoundedRect(88, currentY + 24, 48, 48, 15, exportColors.primary);
+        context.fillStyle = exportColors.primaryText;
         context.font = '800 24px "Noto Sans Thai", sans-serif';
         const numberText = String(index + 1);
         context.fillText(numberText, 112 - context.measureText(numberText).width / 2, currentY + 57);
 
-        context.fillStyle = '#ffffff';
+        context.fillStyle = exportColors.text;
         context.font = '700 31px "Noto Sans Thai", sans-serif';
         context.fillText(`${item.name} ×${item.quantity}`, 158, currentY + 50, 560);
-        context.fillStyle = '#ffffff';
+        context.fillStyle = exportColors.text;
         context.font = '800 32px "Noto Sans Thai", sans-serif';
         fillTextFromRight(`฿${Number(item.amount).toFixed(2)}`, 978, currentY + 51, 755);
 
-        context.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        context.fillStyle = exportColors.subtext;
         context.font = '600 26px "Noto Sans Thai", sans-serif';
         payerLines.forEach((line, lineIndex) => {
           context.fillText(line, 158, currentY + 88 + lineIndex * 34, 800);
@@ -1031,25 +1663,49 @@ function App() {
       });
 
       currentY += 42;
-      context.fillStyle = 'rgba(255, 255, 255, 0.72)';
+      context.fillStyle = exportColors.subtext;
       context.font = '800 25px "Noto Sans Thai", sans-serif';
       context.fillText(`ยอดที่ต้องจ่าย · ${summarySettlements.length} คน`, 74, currentY);
       currentY += 28;
 
       summarySettlements.forEach((settlement, index) => {
         const y = currentY + index * 94;
-        fillRoundedRect(64, y, 952, 80, 22, index % 2 === 0 ? '#393053' : '#443C68');
-        context.fillStyle = '#ffffff';
+        fillRoundedRect(64, y, 952, 80, 22, index % 2 === 0 ? exportColors.rowA : exportColors.rowB, exportCardBorder);
+        context.fillStyle = exportColors.text;
         context.font = '700 32px "Noto Sans Thai", sans-serif';
         context.fillText(settlement.name, 100, y + 52, 610);
-        context.fillStyle = '#ffffff';
+        context.fillStyle = exportColors.text;
         context.font = '800 34px "Noto Sans Thai", sans-serif';
         fillTextFromRight(`฿${Number(settlement.amount).toFixed(2)}`, 978, y + 53, 750);
       });
 
-      context.fillStyle = 'rgba(255, 255, 255, 0.56)';
+      const { default: QRCode } = await import('qrcode');
+      const qrCanvas = document.createElement('canvas');
+      await QRCode.toCanvas(qrCanvas, shareUrl, {
+        width: 218,
+        margin: 2,
+        errorCorrectionLevel: 'L',
+        color: { dark: '#0F172A', light: '#FFFFFF' },
+      });
+      fillRoundedRect(64, qrTop, 952, 280, 28, exportColors.rowA, exportCardBorder);
+      fillRoundedRect(82, qrTop + 15, 250, 250, 22, '#FFFFFF', 'rgba(15, 23, 42, 0.1)');
+      context.drawImage(qrCanvas, 98, qrTop + 31, 218, 218);
+
+      context.fillStyle = exportColors.primary;
+      context.font = '800 27px "Noto Sans Thai", sans-serif';
+      context.fillText('SCAN TO SEE BILL DETAILS', 368, qrTop + 68, 596);
+      context.fillStyle = exportColors.text;
+      context.font = '700 29px "Noto Sans Thai", sans-serif';
+      context.fillText('Open the full item and payment', 368, qrTop + 116, 596);
+      context.fillText('breakdown on any phone', 368, qrTop + 153, 596);
+      context.fillStyle = exportColors.subtext;
+      context.font = '600 23px "Noto Sans Thai", sans-serif';
+      context.fillText('harn-kun.vercel.app/history', 368, qrTop + 202, 596);
+      context.fillText('Anyone with this QR can view this bill.', 368, qrTop + 240, 596);
+
+      context.fillStyle = exportColors.footer;
       context.font = '700 23px "Noto Sans Thai", sans-serif';
-      context.fillText('HARN KUN · แบ่งง่าย จ่ายชัด', 72, height - 64);
+      context.fillText('HARN KUN · แบ่งง่าย จ่ายชัด', 72, height - 42);
 
       const safeEventName = summaryEventName.replace(/[^A-Za-z0-9\u0E00-\u0E7F]+/g, '-') || 'harn-kun';
       const fileName = `${safeEventName}-summary.png`;
@@ -1087,91 +1743,192 @@ function App() {
 
   const stepNumber = step === 'friends' ? 1 : 2;
 
+  const toggleTheme = () => {
+    const updateTheme = () => setTheme((current) => current === 'dark' ? 'finance' : 'dark');
+    const useFullPageTransition = window.innerWidth >= 760
+      && !window.matchMedia('(pointer: coarse)').matches
+      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (document.startViewTransition && useFullPageTransition) {
+      document.startViewTransition(updateTheme);
+    } else {
+      updateTheme();
+    }
+  };
+
   return (
     <ClickSpark as="main" className="app">
       <div className="silk-background" aria-hidden="true">
         {silkReady && (
           <Suspense fallback={null}>
-            <Silk color="#443C68" />
+            <Silk color="#FFFFFF" />
           </Suspense>
         )}
       </div>
 
-      <section className="hero" aria-label="Harn Kun home">
-        <span className="eyebrow">WELCOME TO</span>
-        <HeroTitle text="Harn Kun" />
-        <p>Make every bill effortless.</p>
-        <SpecularButton
-          className="hero-start-button"
-          aria-label={hasActiveDraft ? 'Resume splitting the current bill' : 'Start splitting a bill'}
+      <section className="home-dashboard" aria-label="Harn Kun home">
+        <button
+          type="button"
+          className="mobile-theme-toggle"
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Use light mode' : 'Use dark mode'}
+          aria-pressed={theme === 'dark'}
+        >
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
+        <header className="home-header">
+          <div>
+            <button type="button" className="home-title-button" onClick={handleHomeTitleTap} aria-label="Harn Kun"><h1>Harn Kun</h1></button>
+          </div>
+          <p>Split any bill, share every expense clearly.</p>
+        </header>
+
+        <section className="home-history-panel" aria-label="Recent bills">
+        <div className="home-recent-heading">
+          <div><span>ON THIS DEVICE</span><h2>Recent bills</h2></div>
+          <div className="home-history-actions">
+            <b>{historyRecords.length}</b>
+            <div className="home-history-sort-control" ref={sortDrawerRef}>
+              <BitsButton type="button" className="home-history-sort" aria-label="Sort recent bills" aria-haspopup="listbox" aria-expanded={sortDrawerOpen} onClick={() => setSortDrawerOpen((open) => !open)}>
+                <span>{{ newest: 'Newest', oldest: 'Oldest', highest: 'High total', lowest: 'Low total' }[historySort]}</span>
+              </BitsButton>
+              <div className={`home-sort-drawer${sortDrawerOpen ? ' is-open' : ''}`} role="listbox" aria-label="Sort recent bills">
+                {[
+                  ['newest', 'Newest'],
+                  ['oldest', 'Oldest'],
+                  ['highest', 'Highest total'],
+                  ['lowest', 'Lowest total'],
+                ].filter(([value]) => value !== historySort).map(([value, label]) => (
+                  <BitsButton
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    tabIndex={sortDrawerOpen ? 0 : -1}
+                    key={value}
+                    onClick={() => {
+                      setHistorySort(value);
+                      setSortDrawerOpen(false);
+                    }}
+                  >
+                    <span>{label}</span>
+                  </BitsButton>
+                ))}
+              </div>
+            </div>
+            <BitsButton type="button" className="home-clear-history" disabled={historyLoading || historyRecords.length === 0} onClick={clearHistory} aria-label="Clear history">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" />
+              </svg>
+            </BitsButton>
+          </div>
+        </div>
+
+        <div className="home-history-list" aria-live="polite">
+          {historyLoading && (
+            <div className="home-history-skeleton" role="status" aria-label="Loading recent bills">
+              {[0, 1, 2].map((item) => (
+                <div className="home-history-skeleton-card" aria-hidden="true" key={item}>
+                  <span className="skeleton-line skeleton-line-date" />
+                  <span className="skeleton-line skeleton-line-title" />
+                  <span className="skeleton-line skeleton-line-meta" />
+                  <span className="skeleton-line skeleton-line-total" />
+                </div>
+              ))}
+            </div>
+          )}
+          {!historyLoading && historyRecords.length === 0 && (
+            <BitsSurface className="home-history-empty">
+              <span aria-hidden="true">＋</span>
+              <strong>No bills yet</strong>
+              <p>Create your first bill split and it will appear here.</p>
+            </BitsSurface>
+          )}
+          {!historyLoading && sortedHistoryRecords.map((record) => (
+            <div className={`home-history-card-shell${removingHistoryId === record.id ? ' is-removing' : ''}`} key={record.id}>
+              <div
+                className={`home-history-delete-underlay${homeHistorySwipe.id === record.id && homeHistorySwipe.offset < -4 ? ' is-visible' : ''}${homeHistorySwipe.id === record.id && homeHistorySwipe.holding ? ' is-holding' : ''}`}
+                style={{
+                  '--delete-swipe-progress': homeHistorySwipe.id === record.id ? Math.min(1, Math.abs(homeHistorySwipe.offset) / 112) : 0,
+                  '--delete-swipe-opacity': homeHistorySwipe.id === record.id ? 0.2 + Math.min(1, Math.abs(homeHistorySwipe.offset) / 112) * 0.8 : 0,
+                  '--delete-swipe-saturation': homeHistorySwipe.id === record.id ? 0.5 + Math.min(1, Math.abs(homeHistorySwipe.offset) / 112) * 1.35 : 0.5,
+                  '--delete-swipe-brightness': homeHistorySwipe.id === record.id ? 0.62 + Math.min(1, Math.abs(homeHistorySwipe.offset) / 112) * 0.48 : 0.62,
+                }}
+                aria-hidden="true"
+              >
+                <div className="home-history-delete-indicator">
+                  <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" /><circle className="delete-progress-ring" cx="22" cy="22" r="19" /></svg>
+                  <span>Delete</span>
+                </div>
+              </div>
+              <BitsButton
+                type="button"
+                className={`history-card home-history-card${homeHistorySwipe.id === record.id ? ' is-swiping' : ''}`}
+                style={{ transform: `translate3d(${homeHistorySwipe.id === record.id ? homeHistorySwipe.offset : 0}px, 0, 0)` }}
+                onPointerDown={(event) => beginHomeHistorySwipe(event, record)}
+                onPointerMove={moveHomeHistorySwipe}
+                onPointerUp={(event) => finishHomeHistorySwipe(event, record)}
+                onPointerCancel={cancelHomeHistorySwipe}
+                onClick={() => openHomeHistoryRecord(record)}
+              >
+                <span className="history-card-date">{new Date(record.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                <strong>{record.eventName}</strong>
+                <small>{record.friends.length} people · {record.billItems.length} items</small>
+                <b>฿{Number(record.total).toFixed(2)}</b>
+                <i aria-hidden="true">›</i>
+              </BitsButton>
+            </div>
+          ))}
+        </div>
+        </section>
+
+        <BitsButton
+          type="button"
+          className="home-create-button"
+          aria-label={hasActiveDraft ? 'Resume splitting the current bill' : 'Create a new bill split'}
           aria-expanded={isCreating}
           onClick={openPanel}
         >
-          {hasActiveDraft ? 'Resume splitting' : 'Start splitting'} <span aria-hidden="true">→</span>
-        </SpecularButton>
+          <span aria-hidden="true">{hasActiveDraft ? '▶' : '+'}</span>
+        </BitsButton>
+
+        {clearHistoryConfirmOpen && (
+          <div className="home-confirm-backdrop" role="presentation" onPointerDown={() => { if (!historyLoading) setClearHistoryConfirmOpen(false); }}>
+            <BitsSurface className="home-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="clear-history-title" aria-describedby="clear-history-description" onPointerDown={(event) => event.stopPropagation()}>
+              <div className="home-confirm-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" /></svg>
+              </div>
+              <span>DELETE HISTORY</span>
+              <h2 id="clear-history-title">Remove all bills?</h2>
+              <p id="clear-history-description">This will permanently remove all {historyRecords.length} bills stored on this device.</p>
+              <div className="home-confirm-actions">
+                <BitsButton type="button" disabled={historyLoading} onClick={() => setClearHistoryConfirmOpen(false)}>Cancel</BitsButton>
+                <BitsButton type="button" className="home-confirm-delete" disabled={historyLoading} onClick={confirmClearHistory}>{historyLoading ? 'Removing…' : 'Remove all bills'}</BitsButton>
+              </div>
+            </BitsSurface>
+          </div>
+        )}
       </section>
 
       <StaggeredMenu
-        canClearHistory={historyRecords.length > 0 && !historyLoading}
-        onClearHistory={clearHistory}
-        onOpen={openHistory}
+        openRequest={menuOpenRequest}
         onClose={closeHistory}
       >
         {historyView && (
           <div className="staggered-history-content">
             <div className="panel-heading history-panel-heading">
               <div>
-                <div className="panel-meta"><span>ON THIS DEVICE</span></div>
+                <div className="panel-meta"><span>{selectedHistory?.isShared ? 'SHARED RECEIPT' : 'ON THIS DEVICE'}</span></div>
                 <h2>{historyView === 'detail' ? selectedHistory?.eventName : 'History'}</h2>
               </div>
             </div>
 
-            {historyView === 'list' && (
-              <div className="history-list">
-                {historyLoading && <p className="history-message">Loading history…</p>}
-                {!historyLoading && historyRecords.length === 0 && (
-                  <BitsSurface className="history-empty">
-                    <strong>No history yet</strong>
-                    <p>Your completed bill splits will appear here automatically.</p>
-                  </BitsSurface>
-                )}
-                {!historyLoading && historyRecords.map((record) => (
-                  <BitsButton
-                    type="button"
-                    className="history-card"
-                    key={record.id}
-                    onClick={() => {
-                      setSelectedHistory(record);
-                      setHistoryView('detail');
-                    }}
-                  >
-                    <span className="history-card-date">{new Date(record.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                    <strong>{record.eventName}</strong>
-                    <small>{record.friends.length} friends · {record.billItems.length} foods</small>
-                    <b>฿{Number(record.total).toFixed(2)}</b>
-                    <i aria-hidden="true">›</i>
-                  </BitsButton>
-                ))}
-              </div>
-            )}
-
             {historyView === 'detail' && selectedHistory && (
               <div className="history-detail">
-                <BitsButton
-                  type="button"
-                  className="history-back-button"
-                  aria-label="Back to all history"
-                  onClick={() => setHistoryView('list')}
-                >
-                  ←
-                </BitsButton>
-
                 <BitsSurface className="history-detail-summary">
                   <div><span>TOTAL</span><strong>฿{Number(selectedHistory.total).toFixed(2)}</strong></div>
                   <small>{new Date(selectedHistory.updatedAt).toLocaleString()}</small>
                 </BitsSurface>
 
-                <h3>Food and sharing</h3>
+                <h3>Items and sharing</h3>
                 <div className="history-food-list">
                   {selectedHistory.billItems.map((item, index) => (
                     <BitsSurface as="article" className="history-food-row" key={`${item.name}-${index}`}>
@@ -1201,7 +1958,7 @@ function App() {
       </StaggeredMenu>
 
       {isCreating && (
-        <div className="overlay" role="presentation" onMouseDown={closePanel}>
+        <div className={`overlay${isWorkflowClosing ? ' is-closing' : ''}`} role="presentation" onMouseDown={closePanel}>
           <BitsSurface as="section" className={`operation-panel step-${step}`} aria-label="New operation" onMouseDown={(event) => event.stopPropagation()}>
             <div className="panel-handle" />
             <div className="panel-heading">
@@ -1219,16 +1976,16 @@ function App() {
               <div className="panel-heading-content">
                 <div className="panel-meta">
                   <span>
-                    {step === 'split' ? `FOOD ${splitIndex + 1} OF ${billItems.length}` : step === 'result' ? 'ALL DONE' : `STEP ${stepNumber} OF 2`}
+                    {step === 'split' ? `ITEM ${splitIndex + 1} OF ${billItems.length}` : step === 'result' ? 'ALL DONE' : `STEP ${stepNumber} OF 2`}
                   </span>
                 </div>
                 {step === 'friends' && (
                   <div className="friends-title">
-                    <h2>Add your friends to <strong>{eventName}</strong></h2>
+                    <h2>Add people to <strong>{eventName}</strong></h2>
                   </div>
                 )}
                 {step === 'bill' && <h2>Scan your bill</h2>}
-                {step === 'split' && <h2>Who shared this?</h2>}
+                {step === 'split' && <h2>Who shared this item?</h2>}
                 {step === 'result' && <h2>Payment summary</h2>}
               </div>
               <BitsButton type="button" className="close-button" onClick={closePanel} aria-label="Close">×</BitsButton>
@@ -1237,14 +1994,14 @@ function App() {
             {step === 'friends' && (
               <div className="friends-step">
                 <form className="friend-form" autoComplete="off" data-form-type="other" onSubmit={addFriend}>
-                  <label htmlFor="friend-name">Friend's name</label>
+                  <label htmlFor="friend-name">Person's name</label>
                   <div className="friend-input-row">
                     <input ref={inputRef} id="friend-name" name="friend-name-entry" value={friendName} onChange={(event) => setFriendName(event.target.value)} type="text" placeholder="Type a name" autoComplete="off" data-form-type="other" data-lpignore="true" enterKeyHint="done" maxLength="60" disabled={friends.length >= 100} />
                     <BitsButton type="submit" className="add-button" disabled={!friendName.trim() || friends.length >= 100}>Add</BitsButton>
                   </div>
                 </form>
 
-                <div className="friends-heading"><span>Friends</span><strong>{friends.length} / 100</strong></div>
+                <div className="friends-heading"><span>People</span><strong>{friends.length} / 100</strong></div>
                 <div className="friend-list" aria-live="polite">
                   {friends.length === 0 ? <p className="empty-list">Add at least 2 people to continue.</p> : friends.map((friend, index) => (
                     <BitsButton key={`${friend}-${index}`} type="button" className="friend-chip" onClick={() => removeFriend(index)}>
@@ -1262,11 +2019,55 @@ function App() {
 
             {step === 'bill' && (
               <div className="bill-step">
-                <input ref={cameraInputRef} className="hidden-file-input" type="file" accept="image/*" capture="environment" onChange={chooseBill} />
+                <input ref={cameraInputRef} className="hidden-file-input" type="file" accept="image/*" capture="environment" onChange={chooseCameraBill} />
                 <input ref={uploadInputRef} className="hidden-file-input" type="file" accept="image/*" onChange={chooseBill} />
 
-                {billImageUrl && (
-                  <BitsSurface className="bill-preview">
+                {cameraFlow && (
+                  <div className="mobile-camera-flow is-editor" role="dialog" aria-modal="true" aria-label="Crop bill photo">
+                    <p className="camera-editor-copy"><strong>Adjust your photo</strong><span>Drag with one finger and pinch with two fingers until only the bill items are inside the box.</span></p>
+                    <div
+                      ref={cropWorkspaceRef}
+                      className="camera-crop-workspace"
+                      onPointerDown={beginCropDrag}
+                      onPointerMove={moveCropDrag}
+                      onPointerUp={endCropDrag}
+                      onPointerCancel={endCropDrag}
+                      onWheel={zoomCropWithWheel}
+                    >
+                      <BitsButton
+                        type="button"
+                        className="crop-aspect-toggle"
+                        style={{ position: 'absolute', top: '12px', right: '12px', left: 'auto', insetInlineStart: 'auto', insetInlineEnd: '12px' }}
+                        aria-label={`Switch crop frame to ${cropAspect === '16:9' ? '9 by 16 portrait' : '16 by 9 landscape'}`}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={toggleCropAspect}
+                      >
+                        <span>{cropAspect}</span>
+                      </BitsButton>
+                      {!cropBaseSize.width && <div className="camera-photo-skeleton" role="status" aria-label="Preparing photo"><span /></div>}
+                      <img
+                        ref={cropImageRef}
+                        src={pendingCameraUrl}
+                        alt="Bill to crop"
+                        draggable="false"
+                        onLoad={() => window.requestAnimationFrame(initializeCropEditor)}
+                        style={{
+                          width: `${cropBaseSize.width}px`,
+                          height: `${cropBaseSize.height}px`,
+                          transform: `translate(-50%, -50%) translate3d(${cropTransform.x}px, ${cropTransform.y}px, 0) rotate(${cropTransform.rotation}deg) scale(${cropTransform.zoom})`,
+                        }}
+                      />
+                      <div ref={cropFrameRef} className={`camera-crop-frame${cropAspect === '9:16' ? ' is-portrait' : ''}`} aria-hidden="true" />
+                    </div>
+                    <div className="camera-confirm-actions">
+                      <BitsButton type="button" disabled={isCropping} onClick={() => (cameraFlow === 'upload' ? uploadInputRef : cameraInputRef).current?.click()}>{cameraFlow === 'upload' ? 'Choose again' : 'Retake'}</BitsButton>
+                      <BitsButton type="button" className="camera-confirm-button" disabled={!cropBaseSize.width || isCropping} onClick={confirmCameraBill}>{isCropping ? 'Preparing…' : 'Confirm'}</BitsButton>
+                    </div>
+                  </div>
+                )}
+
+                {!cameraFlow && billImageUrl && (
+                  <BitsSurface className={`bill-preview${ocrStatus === 'scanning' ? ' is-scanning' : ''}`}>
                     <img src={billImageUrl} alt="Selected bill" />
                     <div><strong>{ocrStatus === 'scanning' ? 'Reading your bill…' : 'Bill photo'}</strong><span></span></div>
                     {ocrStatus !== 'scanning' && (
@@ -1277,16 +2078,21 @@ function App() {
                   </BitsSurface>
                 )}
 
-                {ocrStatus === 'scanning' ? (
+                {!cameraFlow && (ocrStatus === 'scanning' ? (
                   <BitsSurface className="scan-progress" aria-live="polite">
                     <div><span style={{ width: `${Math.round(ocrProgress * 100)}%` }} /></div>
                     <p>กำลังอ่านใบเสร็จ… {Math.round(ocrProgress * 100)}%</p>
+                    <div className="scan-result-skeleton" aria-hidden="true">
+                      {[0, 1, 2].map((item) => (
+                        <div key={item}><i /><span /><b /></div>
+                      ))}
+                    </div>
                   </BitsSurface>
                 ) : (
                   <>
                     {!billImageUrl && ocrStatus === 'idle' && (
                       <div className="scan-start-options">
-                        <BitsButton type="button" disabled={cooldownRemaining > 0} onClick={() => cameraInputRef.current?.click()}>
+                        <BitsButton type="button" disabled={cooldownRemaining > 0} onClick={startCameraFlow}>
                           <span className="scan-option-icon" aria-hidden="true">●</span>
                           <span><strong>{cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'Take picture'}</strong><small>Open your phone camera</small></span>
                           <b aria-hidden="true">›</b>
@@ -1298,7 +2104,7 @@ function App() {
                         </BitsButton>
                         <BitsButton type="button" onClick={addManualItem}>
                           <span className="scan-option-icon manual-icon" aria-hidden="true">+</span>
-                          <span><strong>Manual add</strong><small>Enter food and prices yourself</small></span>
+                          <span><strong>Manual add</strong><small>Enter bill items and amounts yourself</small></span>
                           <b aria-hidden="true">›</b>
                         </BitsButton>
                       </div>
@@ -1307,7 +2113,7 @@ function App() {
                     {(ocrStatus === 'review' || billItems.length > 0) && (
                       <>
                         <div className={`bill-list-heading${editingBillIndex !== null ? ' is-editing' : ''}`}>
-                          <span>Food detected</span>
+                          <span>Items detected</span>
                           <strong>{billItems.length} items</strong>
                           {editingBillIndex === null && <small className="bill-swipe-hint">Swipe right to edit · left to remove</small>}
                         </div>
@@ -1328,7 +2134,7 @@ function App() {
                                   <BitsSurface className="bill-item bill-item-editor" ref={billEditorRef}>
                                     <label className="bill-field bill-field-name">
                                       <span>Name</span>
-                                      <input autoFocus aria-label={`Food ${index + 1}`} name={`food-name-${index}`} value={item.name} onChange={(event) => updateBillItem(index, 'name', event.target.value)} placeholder="Food name" autoComplete="off" data-form-type="other" data-lpignore="true" />
+                                      <input autoFocus aria-label={`Item ${index + 1}`} name={`food-name-${index}`} value={item.name} onChange={(event) => updateBillItem(index, 'name', event.target.value)} placeholder="Item or expense" autoComplete="off" data-form-type="other" data-lpignore="true" />
                                     </label>
                                     <label className="bill-field bill-field-quantity">
                                       <span>Quantity</span>
@@ -1352,7 +2158,7 @@ function App() {
                                     onPointerUp={finishBillSwipe}
                                     onPointerCancel={(event) => finishBillSwipe(event, false)}
                                   >
-                                    <strong className="bill-item-name">{item.name || 'Unnamed food'}</strong>
+                                    <strong className="bill-item-name">{item.name || 'Unnamed item'}</strong>
                                     <span className="bill-item-quantity">{Number(item.quantity) || 1}</span>
                                     <strong className="bill-item-price">฿{(Number(item.amount) || 0).toFixed(2)}</strong>
                                     <BitsButton className="bill-edit-button" type="button" onClick={() => setEditingBillIndex(index)} aria-label={`Edit ${item.name || 'item'}`}>Edit</BitsButton>
@@ -1361,6 +2167,7 @@ function App() {
                               </div>
                             );
                           })}
+                          <BitsButton type="button" className="manual-item-button bill-list-add-button" onClick={addManualItem}>+ Add item manually</BitsButton>
                         </div>
                       </>
                     )}
@@ -1373,14 +2180,13 @@ function App() {
                       </div>
                     )}
                   </>
-                )}
+                ))}
 
-                {error && <p className="form-error" role="alert">{error}</p>}
-                {ocrStatus !== 'scanning' && (
+                {!cameraFlow && error && <p className="form-error" role="alert">{error}</p>}
+                {!cameraFlow && ocrStatus !== 'scanning' && (
                   <div className="bill-footer-actions">
                     {(ocrStatus === 'review' || billItems.length > 0) && (
                       <>
-                        <BitsButton type="button" className="manual-item-button" onClick={addManualItem}>+ Add food manually</BitsButton>
                         <BitsSurface className="bill-total"><span>SUM</span><strong>฿{total.toFixed(2)}</strong></BitsSurface>
                         <BitsButton className="save-button" type="button" disabled={!billItems.some((item) => item.name.trim())} onClick={startSplitting}>Confirm & split</BitsButton>
                       </>
@@ -1393,7 +2199,7 @@ function App() {
             {step === 'split' && billItems[splitIndex] && (
               <div className="split-step">
                 <BitsSurface className="split-food-card">
-                  <span>FOOD</span>
+                  <span>ITEM</span>
                   <h3>{billItems[splitIndex].name}</h3>
                   <div>
                     <small>Quantity {billItems[splitIndex].quantity}</small>
@@ -1428,7 +2234,7 @@ function App() {
                 <div className="split-navigation">
                   <BitsButton type="button" className="previous-button" disabled={splitIndex === 0 || isSaving} onClick={goToPreviousFood}>Previous</BitsButton>
                   <BitsButton type="button" className="next-button" disabled={(allocations[splitIndex] || []).length === 0 || isSaving} onClick={goToNextFood}>
-                    {isSaving ? 'Calculating…' : splitIndex === billItems.length - 1 ? 'Calculate' : 'Next food'}
+                    {isSaving ? 'Calculating…' : splitIndex === billItems.length - 1 ? 'Calculate' : 'Next item'}
                   </BitsButton>
                 </div>
               </div>
@@ -1437,7 +2243,7 @@ function App() {
             {step === 'result' && (
               <div className="result-step">
                 <BitsSurface className="result-event">
-                  <span>EVENT</span>
+                  <span>BILL</span>
                   <strong>{eventName}</strong>
                   <small>Total ฿{total.toFixed(2)}</small>
                 </BitsSurface>

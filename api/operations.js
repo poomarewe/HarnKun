@@ -25,7 +25,7 @@ export default {
       || !Array.isArray(billItems)
       || billItems.length === 0
     ) {
-      return json({ message: 'An event name, 2–100 friends, and bill items are required.' }, 400);
+      return json({ message: 'A bill name, 2–100 people, and at least one item are required.' }, 400);
     }
 
     const cleanItems = billItems

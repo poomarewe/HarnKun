@@ -4,5 +4,8 @@
     "api/scan-bill.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/history", "destination": "/index.html" }
+  ]
 }

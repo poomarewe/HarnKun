@@ -124,7 +124,7 @@ app.post('/api/operations', (request, response) => {
     !Array.isArray(billItems) ||
     billItems.length === 0
   ) {
-    return response.status(400).json({ message: 'An event name, 2–100 friends, and bill items are required.' });
+    return response.status(400).json({ message: 'A bill name, 2–100 people, and at least one item are required.' });
   }
 
   const cleanItems = billItems
@@ -149,7 +149,7 @@ app.post('/api/operations', (request, response) => {
 
   console.log('\n--- New Harn Kun operation ---');
   console.log(`Event: ${eventName.trim()}`);
-  console.log(`Friends (${friends.length}): ${friends.join(', ')}`);
+  console.log(`People (${friends.length}): ${friends.join(', ')}`);
   console.log('Bill:');
   cleanItems.forEach((item, index) => {
     console.log(`  ${index + 1}. ${item.name} x${item.quantity} — ฿${item.amount.toFixed(2)}`);
