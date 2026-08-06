@@ -47,6 +47,11 @@ body,
 }
 
 @media (display-mode: standalone), (display-mode: fullscreen) {
+  :root {
+    /* iOS standalone WebKit can subtract the status-bar inset from lvh/dvh. */
+    --full-height: 100vh;
+  }
+
   html,
   body,
   #root,

@@ -30,6 +30,13 @@
   }
 }
 
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  :root {
+    /* Keep the installed-app canvas behind the iOS status bar. */
+    --full-height: 100vh;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
