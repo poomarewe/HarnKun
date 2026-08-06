@@ -1,15 +1,26 @@
 :root {
   --visible-height: 100dvh;
   --visible-offset-top: 0px;
+  --full-height: 100vh;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
   --palette-lavender: #42b883;
   --palette-indigo: #17324d;
   --palette-plum: #ffffff;
   --palette-ink: #f4f7f5;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  font-family: 'Manrope', system-ui, sans-serif;
+  font-family: 'Mali', system-ui, sans-serif;
   color: #17324d;
   background: var(--palette-ink);
   font-synthesis: none;
+}
+
+@supports (height: 100lvh) {
+  :root {
+    --full-height: 100lvh;
+  }
 }
 
 * {
@@ -20,11 +31,29 @@ html,
 body,
 #root {
   width: 100%;
-  height: 100%;
+  height: var(--full-height);
   margin: 0;
   overflow: hidden;
   background: var(--palette-ink);
   touch-action: pan-x pan-y;
+}
+
+@supports (-webkit-touch-callout: none) {
+  html,
+  body,
+  #root {
+    min-height: -webkit-fill-available;
+  }
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  html,
+  body,
+  #root,
+  .app {
+    width: 100%;
+    min-height: 100%;
+  }
 }
 
 body {
@@ -33,9 +62,10 @@ body {
 
 .app-version {
   position: fixed;
-  bottom: max(6px, env(safe-area-inset-bottom));
-  left: max(8px, env(safe-area-inset-left));
-  z-index: 120;
+  bottom: 2px;
+  left: 50%;
+  z-index: 0;
+  transform: translateX(-50%);
   color: #475569;
   font-size: 0.52rem;
   font-weight: 700;
@@ -62,7 +92,7 @@ button {
 .app {
   position: relative;
   width: 100%;
-  height: var(--visible-height);
+  height: var(--full-height);
   overflow: hidden;
   isolation: isolate;
   -webkit-user-select: none;
@@ -98,10 +128,17 @@ button {
     max(20px, env(safe-area-inset-left));
 }
 
+@media (max-width: 699px) {
+  .home-dashboard {
+    top: var(--visible-offset-top);
+    bottom: auto;
+    height: var(--visible-height);
+  }
+}
+
 .home-header {
   flex: none;
   padding: 8px 68px 22px 2px;
-  border-bottom: 1px solid rgba(99, 89, 133, 0.34);
 }
 
 .home-header > div > span,
@@ -115,26 +152,13 @@ button {
 .home-header h1 {
   margin: 4px 0 0;
   color: #fff;
-  font-family: 'Noto Sans Thai', 'Manrope', sans-serif;
+  font-family: 'Mali', system-ui, sans-serif;
   font-size: clamp(3.5rem, 17vw, 5.6rem);
   line-height: 1;
   letter-spacing: -0.055em;
 }
 
-.home-title-button {
-  display: block;
-  margin: 0;
-  padding: 0;
-  cursor: default;
-  border: 0;
-  color: inherit;
-  background: transparent;
-  text-align: left;
-}
 
-.home-title-button:active {
-  transform: scale(0.985);
-}
 
 .home-header p {
   margin: 10px 0 0;
@@ -218,7 +242,7 @@ button {
   outline: none;
   color: #fff;
   background: var(--palette-plum);
-  font: 750 0.59rem 'Manrope', sans-serif;
+  font: 750 0.59rem system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 .home-history-sort span,
@@ -298,10 +322,6 @@ button {
   text-align: left;
 }
 
-.home-sort-drawer > button.is-selected {
-  color: #fff;
-  background: rgba(99, 89, 133, 0.72);
-}
 
 .home-sort-drawer > button i {
   position: absolute;
@@ -335,9 +355,15 @@ button {
   gap: 11px;
   padding: 2px 2px 88px;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 72px), transparent 100%);
   mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 72px), transparent 100%);
+}
+
+.home-history-list::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .home-history-card {
@@ -460,7 +486,7 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
   place-items: center;
 }
 
-.home-history-delete-indicator svg {
+.home-history-delete-indicator > svg {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -487,9 +513,20 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
 .home-history-delete-indicator span {
   position: relative;
   z-index: 1;
+  display: grid;
+  place-items: center;
   color: #fff;
-  font-size: 0.58rem;
-  font-weight: 850;
+}
+
+.home-history-delete-indicator .delete-trash-icon {
+  position: static;
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 @keyframes history-delete-hold {
@@ -603,10 +640,6 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
   margin: 5px 0 0;
 }
 
-.home-history-message {
-  margin: auto;
-  font-weight: 700;
-}
 
 .home-dashboard .home-create-button {
   position: absolute;
@@ -643,6 +676,12 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
   font-size: 1.7rem;
   font-weight: 600;
   line-height: 1;
+}
+
+.home-dashboard .home-history-empty .home-empty-create-button {
+  position: relative;
+  inset: auto;
+  margin: 0 0 12px;
 }
 
 .home-confirm-backdrop {
@@ -827,7 +866,6 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
     justify-content: center;
     flex-direction: column;
     padding: 0 clamp(22px, 4vw, 64px) 0 clamp(4px, 1vw, 14px);
-    border-right: 1px solid rgba(99, 89, 133, 0.34);
     border-bottom: 0;
   }
 
@@ -946,116 +984,15 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
   to { opacity: 1; }
 }
 
-.hero {
-  position: absolute;
-  top: 45%;
-  left: 50%;
-  width: 100%;
-  padding: clamp(24px, 6vw, 80px);
-  text-align: center;
-  transform: translate(-50%, -50%);
-}
 
-.eyebrow {
-  display: block;
-  margin-bottom: 16px;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.67rem;
-  font-weight: 800;
-  letter-spacing: 0.42em;
-  text-shadow: 0 2px 14px rgba(24, 18, 43, 0.48);
-}
 
-.hero h1 {
-  position: relative;
-  width: min(84vw, 650px);
-  height: 1.12em;
-  margin: 0 auto;
-  overflow: visible;
-  color: #635985;
-  font-family: 'Noto Sans Thai', sans-serif;
-  font-size: clamp(4rem, 12vw, 8.5rem);
-  font-weight: 800;
-  line-height: 0.98;
-  letter-spacing: -0.055em;
-}
 
-.pressure-shine-title {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #635985;
-  white-space: nowrap;
-  filter: drop-shadow(0 14px 22px rgba(24, 18, 43, 0.36));
-}
 
-.pressure-shine-character {
-  display: inline-block;
-  color: #635985;
-  font-weight: 700;
-  transform: scaleX(1);
-  transform-origin: center;
-}
 
-.pressure-shine-space {
-  display: inline-block;
-  width: 0.28em;
-  flex: 0 0 0.28em;
-}
 
-.hero p {
-  margin: 22px 0 0;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: clamp(0.9rem, 1.8vw, 1.08rem);
-  font-weight: 600;
-  letter-spacing: 0.015em;
-  text-shadow: 0 2px 16px rgba(24, 18, 43, 0.48);
-}
 
-.specular-button {
-  --sb-radius: 18px;
-  --sb-tint: #635985;
-  --sb-text-color: #fff;
-  position: relative;
-  display: inline-flex;
-  min-width: 222px;
-  min-height: 56px;
-  margin: 28px 0 0;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  overflow: visible;
-  padding: 18px 40px;
-  border: 1px solid rgba(99, 89, 133, 0.9);
-  border-radius: var(--sb-radius);
-  outline: none;
-  color: var(--sb-text-color);
-  background: linear-gradient(135deg, var(--palette-lavender), var(--palette-indigo));
-  box-shadow: 0 14px 34px rgba(24, 18, 43, 0.42);
-  font-weight: 800;
-  line-height: 1;
-}
 
-.specular-button__effect {
-  position: absolute;
-  inset: -20px;
-  z-index: 1;
-  display: block;
-  width: calc(100% + 40px);
-  height: calc(100% + 40px);
-  pointer-events: none;
-}
 
-.specular-button__label {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
 
 .specular-button:focus-visible,
 .staggered-menu-toggle:focus-visible {
@@ -1063,12 +1000,6 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
   outline-offset: 4px;
 }
 
-.click-spark-canvas {
-  position: absolute;
-  inset: 0;
-  z-index: 80;
-  pointer-events: none;
-}
 
 .staggered-menu {
   position: fixed;
@@ -1148,20 +1079,8 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
     background-size: 32px 32px;
   }
 
-  .hero {
-    top: 43%;
-    padding-inline: 22px;
-  }
 
-  .hero h1 {
-    width: min(88vw, 650px);
-  }
 
-  .specular-button {
-    min-width: 210px;
-    min-height: 54px;
-    margin-top: 24px;
-  }
 
   .staggered-menu-toggle {
     top: max(16px, env(safe-area-inset-top));
@@ -1328,6 +1247,20 @@ html[data-theme='finance'] .home-dashboard .home-create-button {
 
   .home-recent-heading {
     padding: 12px 0 10px;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 699px) {
+  .home-header {
+    padding-bottom: 6px;
+  }
+
+  .home-header h1 {
+    font-size: clamp(3.5rem, 17vw, 5rem);
+  }
+
+  .home-recent-heading {
+    padding-top: 8px;
   }
 }
 

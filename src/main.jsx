@@ -1,17 +1,22 @@
-import { lazy, StrictMode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { BitsButton, BitsSurface, ClickSpark } from './ReactBitsUI';
+import '@fontsource/mali/400.css';
+import '@fontsource/mali/600.css';
+import '@fontsource/mali/700.css';
+import { BitsButton, BitsSurface } from './ReactBitsUI';
 import StaggeredMenu from './StaggeredMenu';
 import './critical.css';
+import './clay-home.css';
 
-const Silk = lazy(() => import('./Silk'));
 const APP_VERSION = __APP_VERSION__;
 const APP_VERSION_TIME = __APP_VERSION_TIME__;
 let appStylesPromise;
 
 const loadAppStyles = () => {
-  if (!appStylesPromise) appStylesPromise = import('./styles.css');
+  if (!appStylesPromise) {
+    appStylesPromise = import('./styles.css').then(() => import('./clay.css'));
+  }
   return appStylesPromise;
 };
 
@@ -470,7 +475,6 @@ async function deleteHistoryRecord(recordId) {
 
 function App() {
   const isSharedHistoryRoute = window.location.pathname === '/history';
-  const [silkReady, setSilkReady] = useState(false);
   const [theme, setTheme] = useState(() => {
     try {
       return window.localStorage.getItem('harn-kun-theme') === 'dark' ? 'dark' : 'finance';
@@ -528,7 +532,6 @@ function App() {
   const cropImageRef = useRef(null);
   const cropPointersRef = useRef(new Map());
   const cropGestureRef = useRef(null);
-  const homeTitleTapRef = useRef(0);
   const homeHistorySwipeRef = useRef(null);
   const homeHistoryClickGuardRef = useRef(null);
   const sortDrawerRef = useRef(null);
@@ -538,9 +541,12 @@ function App() {
   const workflowCloseTimerRef = useRef(null);
 
   useEffect(() => {
+    const themeBackground = theme === 'dark' ? '#272432' : '#ebe8f3';
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0F172A' : '#F4F7F5');
+    document.documentElement.style.backgroundColor = themeBackground;
+    document.body.style.backgroundColor = themeBackground;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeBackground);
     try {
       window.localStorage.setItem('harn-kun-theme', theme);
     } catch {
@@ -576,42 +582,6 @@ function App() {
     if (historySort === 'lowest') return records.sort((a, b) => Number(a.total) - Number(b.total));
     return records.sort((a, b) => b.updatedAt - a.updatedAt);
   }, [historyRecords, historySort]);
-
-  useEffect(() => {
-    let idleHandle;
-    let fallbackTimer;
-    let loadTimer;
-
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const coarsePointer = window.matchMedia('(pointer: coarse)');
-
-    // Phones and tablets use the lightweight CSS silk treatment. It preserves
-    // the look without starting a continuous WebGL render loop on mobile CPUs.
-    if (reducedMotion.matches || coarsePointer.matches || window.innerWidth <= 699) {
-      return undefined;
-    }
-
-    const showSilk = () => setSilkReady(true);
-    const scheduleSilk = () => {
-      loadTimer = window.setTimeout(() => {
-        if ('requestIdleCallback' in window) {
-          idleHandle = window.requestIdleCallback(showSilk, { timeout: 800 });
-        } else {
-          fallbackTimer = window.setTimeout(showSilk, 150);
-        }
-      }, 250);
-    };
-
-    if (document.readyState === 'complete') scheduleSilk();
-    else window.addEventListener('load', scheduleSilk, { once: true });
-
-    return () => {
-      window.removeEventListener('load', scheduleSilk);
-      if (idleHandle !== undefined) window.cancelIdleCallback?.(idleHandle);
-      window.clearTimeout(loadTimer);
-      window.clearTimeout(fallbackTimer);
-    };
-  }, []);
 
   useEffect(() => () => {
     window.clearTimeout(homeHistorySwipeRef.current?.holdTimer);
@@ -855,22 +825,6 @@ function App() {
     setIsCreating(true);
   };
 
-  const openHistory = async () => {
-    await loadAppStyles();
-    setIsCreating(false);
-    setSelectedHistory(null);
-    setHistoryView('list');
-    setHistoryLoading(true);
-    try {
-      setHistoryRecords(await readHistoryRecords());
-    } catch (historyError) {
-      console.error('Could not read local history:', historyError);
-      setHistoryRecords([]);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
   const closeHistory = () => {
     setHistoryView(null);
     setSelectedHistory(null);
@@ -927,6 +881,7 @@ function App() {
 
   useEffect(() => {
     if (!isSharedHistoryRoute) return;
+    loadAppStyles();
     const sharedValue = new URLSearchParams(window.location.search).get('r');
     if (!sharedValue) {
       setError('This shared bill link is missing its bill details.');
@@ -1040,60 +995,6 @@ function App() {
     homeHistorySwipeRef.current = null;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
     setHomeHistorySwipe({ id: null, offset: 0, holding: false });
-  };
-
-  const addRandomSampleBills = async () => {
-    const eventNames = ['Weekend Trip', 'Shared Apartment', 'Birthday Party', 'Team Outing', 'Monthly Utilities', 'Movie Night', 'Road Trip', 'Group Booking', 'House Supplies', 'Shared Purchase'];
-    const friendPool = ['Mook', 'Beam', 'Nan', 'Palm', 'Ice', 'Ploy', 'Boss', 'Mint'];
-    const foodPool = [
-      ['Taxi fare', 180], ['Hotel room', 1200], ['Movie tickets', 480], ['Internet bill', 650],
-      ['Electricity', 920], ['Groceries', 740], ['Parking', 120], ['Event tickets', 900],
-      ['Shared supplies', 350], ['Delivery fee', 80], ['Rental fee', 500], ['Service charge', 150],
-    ];
-    const now = Date.now();
-    const randomRecords = Array.from({ length: 10 }, (_, recordIndex) => {
-      const friends = [...friendPool].sort(() => Math.random() - 0.5).slice(0, 2 + Math.floor(Math.random() * 4));
-      const billItems = [...foodPool]
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 2 + Math.floor(Math.random() * 4))
-        .map(([name, baseAmount]) => ({ name, quantity: 1, amount: baseAmount + Math.floor(Math.random() * 4) * 5 }));
-      const allocations = billItems.map(() => {
-        const selected = friends.filter(() => Math.random() > 0.38);
-        return selected.length > 0 ? selected : [friends[Math.floor(Math.random() * friends.length)]];
-      });
-      const centsByFriend = Object.fromEntries(friends.map((friend) => [friend, 0]));
-      billItems.forEach((item, itemIndex) => {
-        const selected = allocations[itemIndex];
-        const itemCents = Math.round(item.amount * 100);
-        const baseShare = Math.floor(itemCents / selected.length);
-        const remainder = itemCents % selected.length;
-        selected.forEach((friend, friendIndex) => {
-          centsByFriend[friend] += baseShare + (friendIndex < remainder ? 1 : 0);
-        });
-      });
-      const updatedAt = now - recordIndex * 86_400_000 - Math.floor(Math.random() * 43_200_000);
-      return {
-        id: `sample-${updatedAt}-${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`,
-        eventName: eventNames[recordIndex],
-        friends,
-        billItems,
-        allocations,
-        settlements: friends.map((name) => ({ name, amount: centsByFriend[name] / 100 })),
-        total: billItems.reduce((sum, item) => sum + item.amount, 0),
-        createdAt: updatedAt,
-        updatedAt,
-      };
-    });
-
-    await Promise.all(randomRecords.map(saveHistoryRecord));
-    setHistoryRecords((records) => [...randomRecords, ...records].sort((a, b) => b.updatedAt - a.updatedAt));
-  };
-
-  const handleHomeTitleTap = () => {
-    homeTitleTapRef.current += 1;
-    if (homeTitleTapRef.current < 13) return;
-    homeTitleTapRef.current = 0;
-    addRandomSampleBills().catch((sampleError) => console.error('Could not add sample bills:', sampleError));
   };
 
   const finishOperation = () => {
@@ -1680,7 +1581,7 @@ function App() {
       const width = 1080;
       const measuringCanvas = document.createElement('canvas');
       const measuringContext = measuringCanvas.getContext('2d');
-      measuringContext.font = '600 27px "Noto Sans Thai", sans-serif';
+      measuringContext.font = '600 27px "Mali", cursive';
 
       const makePayerLines = (selectedFriends) => {
         const prefix = `หาร ${selectedFriends.length} คน: `;
@@ -1714,33 +1615,37 @@ function App() {
       const context = canvas.getContext('2d');
       const isDarkExport = theme === 'dark';
       const exportColors = isDarkExport ? {
-        backgroundStart: '#0F172A',
-        backgroundMiddle: '#142033',
-        backgroundEnd: '#0F172A',
-        glowStart: 'rgba(52, 211, 153, 0.18)',
-        glowEnd: 'rgba(52, 211, 153, 0)',
-        primary: '#34D399',
-        primaryText: '#0F172A',
-        text: '#F8FAFC',
-        subtext: '#CBD5E1',
-        summary: '#1E293B',
-        rowA: '#1E293B',
-        rowB: '#243247',
-        footer: '#94A3B8',
+        backgroundStart: '#272432',
+        backgroundMiddle: '#302C3E',
+        backgroundEnd: '#1E1B29',
+        glowStart: 'rgba(169, 155, 234, 0.24)',
+        glowEnd: 'rgba(169, 155, 234, 0)',
+        coralStart: 'rgba(255, 146, 141, 0.16)',
+        primary: '#A99BEA',
+        primaryText: '#272432',
+        text: '#F6F2FB',
+        subtext: '#B6AEC3',
+        summary: '#373247',
+        rowA: '#302C3E',
+        rowB: '#373247',
+        footer: '#B6AEC3',
+        shadow: 'rgba(0, 0, 0, 0.34)',
       } : {
-        backgroundStart: '#F4F7F5',
-        backgroundMiddle: '#E6EFEA',
-        backgroundEnd: '#F4F7F5',
-        glowStart: 'rgba(66, 184, 131, 0.2)',
-        glowEnd: 'rgba(66, 184, 131, 0)',
-        primary: '#42B883',
-        primaryText: '#0F172A',
-        text: '#0F172A',
-        subtext: '#475569',
-        summary: '#FFFFFF',
-        rowA: '#FFFFFF',
-        rowB: '#EEF6F2',
-        footer: '#475569',
+        backgroundStart: '#F0EDF6',
+        backgroundMiddle: '#EBE8F3',
+        backgroundEnd: '#DDD7E9',
+        glowStart: 'rgba(132, 117, 214, 0.24)',
+        glowEnd: 'rgba(132, 117, 214, 0)',
+        coralStart: 'rgba(255, 130, 124, 0.16)',
+        primary: '#8475D6',
+        primaryText: '#FFFFFF',
+        text: '#373348',
+        subtext: '#777087',
+        summary: '#F0EDF6',
+        rowA: '#E9E5F1',
+        rowB: '#E3DEED',
+        footer: '#777087',
+        shadow: 'rgba(76, 65, 101, 0.2)',
       };
 
       const fillRoundedRect = (x, y, rectWidth, rectHeight, radius, fillStyle, strokeStyle = null) => {
@@ -1773,6 +1678,15 @@ function App() {
         context.fillText(text, Math.max(minLeft, right - textWidth), y);
       };
 
+      const fillRaisedRoundedRect = (x, y, rectWidth, rectHeight, radius, fillStyle, strokeStyle = null) => {
+        context.save();
+        context.shadowColor = exportColors.shadow;
+        context.shadowBlur = 14;
+        context.shadowOffsetY = 7;
+        fillRoundedRect(x, y, rectWidth, rectHeight, radius, fillStyle, strokeStyle);
+        context.restore();
+      };
+
       const gradient = context.createLinearGradient(0, 0, width, height);
       gradient.addColorStop(0, exportColors.backgroundStart);
       gradient.addColorStop(0.55, exportColors.backgroundMiddle);
@@ -1786,46 +1700,52 @@ function App() {
       context.fillStyle = glow;
       context.fillRect(0, 0, width, 700);
 
+      const coralGlow = context.createRadialGradient(80, height - 40, 0, 80, height - 40, 620);
+      coralGlow.addColorStop(0, exportColors.coralStart);
+      coralGlow.addColorStop(1, 'rgba(255, 130, 124, 0)');
+      context.fillStyle = coralGlow;
+      context.fillRect(0, Math.max(0, height - 720), 760, 720);
+
       context.fillStyle = exportColors.primary;
-      context.font = '800 34px "Noto Sans Thai", sans-serif';
+      context.font = '700 34px "Mali", cursive';
       context.fillText('หารกัน', 72, 82);
       context.fillStyle = exportColors.text;
-      context.font = '800 64px "Noto Sans Thai", sans-serif';
+      context.font = '700 64px "Mali", cursive';
       context.fillText(summaryEventName, 72, 162, 936);
 
       const exportCardBorder = isDarkExport ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)';
 
-      fillRoundedRect(72, 202, 936, 102, 25, exportColors.summary, exportCardBorder);
+      fillRaisedRoundedRect(72, 202, 936, 102, 25, exportColors.summary, exportCardBorder);
       context.fillStyle = exportColors.subtext;
-      context.font = '700 25px "Noto Sans Thai", sans-serif';
+      context.font = '700 25px "Mali", cursive';
       context.fillText('ยอดรวมทั้งหมด', 104, 242);
       context.fillStyle = exportColors.text;
-      context.font = '800 44px "Noto Sans Thai", sans-serif';
+      context.font = '700 44px "Mali", cursive';
       fillTextFromRight(`฿${summaryTotal.toFixed(2)}`, 974, 270, 480);
 
       context.fillStyle = exportColors.subtext;
-      context.font = '800 25px "Noto Sans Thai", sans-serif';
+      context.font = '700 25px "Mali", cursive';
       context.fillText(`รายการค่าใช้จ่าย · ${summaryBillItems.length} รายการ`, 74, 358);
 
       let currentY = 388;
       foodLayouts.forEach(({ item, payerLines, height: rowHeight }, index) => {
-        fillRoundedRect(64, currentY, 952, rowHeight, 24, index % 2 === 0 ? exportColors.rowA : exportColors.rowB, exportCardBorder);
+        fillRaisedRoundedRect(64, currentY, 952, rowHeight, 24, index % 2 === 0 ? exportColors.rowA : exportColors.rowB, exportCardBorder);
 
         fillRoundedRect(88, currentY + 24, 48, 48, 15, exportColors.primary);
         context.fillStyle = exportColors.primaryText;
-        context.font = '800 24px "Noto Sans Thai", sans-serif';
+        context.font = '700 24px "Mali", cursive';
         const numberText = String(index + 1);
         context.fillText(numberText, 112 - context.measureText(numberText).width / 2, currentY + 57);
 
         context.fillStyle = exportColors.text;
-        context.font = '700 31px "Noto Sans Thai", sans-serif';
+        context.font = '700 31px "Mali", cursive';
         context.fillText(`${item.name} ×${item.quantity}`, 158, currentY + 50, 560);
         context.fillStyle = exportColors.text;
-        context.font = '800 32px "Noto Sans Thai", sans-serif';
+        context.font = '700 32px "Mali", cursive';
         fillTextFromRight(`฿${Number(item.amount).toFixed(2)}`, 978, currentY + 51, 755);
 
         context.fillStyle = exportColors.subtext;
-        context.font = '600 26px "Noto Sans Thai", sans-serif';
+        context.font = '600 26px "Mali", cursive';
         payerLines.forEach((line, lineIndex) => {
           context.fillText(line, 158, currentY + 88 + lineIndex * 34, 800);
         });
@@ -1834,18 +1754,18 @@ function App() {
 
       currentY += 42;
       context.fillStyle = exportColors.subtext;
-      context.font = '800 25px "Noto Sans Thai", sans-serif';
+      context.font = '700 25px "Mali", cursive';
       context.fillText(`ยอดที่ต้องจ่าย · ${summarySettlements.length} คน`, 74, currentY);
       currentY += 28;
 
       summarySettlements.forEach((settlement, index) => {
         const y = currentY + index * 94;
-        fillRoundedRect(64, y, 952, 80, 22, index % 2 === 0 ? exportColors.rowA : exportColors.rowB, exportCardBorder);
+        fillRaisedRoundedRect(64, y, 952, 80, 22, index % 2 === 0 ? exportColors.rowA : exportColors.rowB, exportCardBorder);
         context.fillStyle = exportColors.text;
-        context.font = '700 32px "Noto Sans Thai", sans-serif';
+        context.font = '700 32px "Mali", cursive';
         context.fillText(settlement.name, 100, y + 52, 610);
         context.fillStyle = exportColors.text;
-        context.font = '800 34px "Noto Sans Thai", sans-serif';
+        context.font = '700 34px "Mali", cursive';
         fillTextFromRight(`฿${Number(settlement.amount).toFixed(2)}`, 978, y + 53, 750);
       });
 
@@ -1855,24 +1775,24 @@ function App() {
         ...SHARE_QR_OPTIONS,
         width: 218,
       });
-      fillRoundedRect(64, qrTop, 952, 280, 28, exportColors.rowA, exportCardBorder);
+      fillRaisedRoundedRect(64, qrTop, 952, 280, 28, exportColors.rowA, exportCardBorder);
       fillRoundedRect(82, qrTop + 15, 250, 250, 22, '#FFFFFF', 'rgba(15, 23, 42, 0.1)');
       context.drawImage(qrCanvas, 98, qrTop + 31, 218, 218);
 
       context.fillStyle = exportColors.primary;
-      context.font = '800 27px "Noto Sans Thai", sans-serif';
+      context.font = '700 27px "Mali", cursive';
       context.fillText('SCAN TO SEE BILL DETAILS', 368, qrTop + 68, 596);
       context.fillStyle = exportColors.text;
-      context.font = '700 29px "Noto Sans Thai", sans-serif';
+      context.font = '700 29px "Mali", cursive';
       context.fillText('Open the full item and payment', 368, qrTop + 116, 596);
       context.fillText('breakdown on any phone', 368, qrTop + 153, 596);
       context.fillStyle = exportColors.subtext;
-      context.font = '600 23px "Noto Sans Thai", sans-serif';
+      context.font = '600 23px "Mali", cursive';
       context.fillText('harn-kun.vercel.app/history', 368, qrTop + 202, 596);
       context.fillText('Anyone with this QR can view this bill.', 368, qrTop + 240, 596);
 
       context.fillStyle = exportColors.footer;
-      context.font = '700 23px "Noto Sans Thai", sans-serif';
+      context.font = '700 23px "Mali", cursive';
       context.fillText('HARN KUN · แบ่งง่าย จ่ายชัด', 72, height - 42);
 
       const safeEventName = summaryEventName.replace(/[^A-Za-z0-9\u0E00-\u0E7F]+/g, '-') || 'harn-kun';
@@ -2045,15 +1965,9 @@ function App() {
   }
 
   return (
-    <ClickSpark as="main" className="app">
+    <main className="app">
       <small className="app-version" title={`Git version from ${APP_VERSION_TIME}`}>{APP_VERSION}</small>
-      <div className="silk-background" aria-hidden="true">
-        {silkReady && (
-          <Suspense fallback={null}>
-            <Silk color="#FFFFFF" />
-          </Suspense>
-        )}
-      </div>
+      <div className="silk-background" aria-hidden="true" />
 
       <section className="home-dashboard" aria-label="Harn Kun home">
         <button
@@ -2066,9 +1980,7 @@ function App() {
           {theme === 'dark' ? '☀' : '☾'}
         </button>
         <header className="home-header">
-          <div>
-            <button type="button" className="home-title-button" onClick={handleHomeTitleTap} aria-label="Harn Kun"><h1>Harn Kun</h1></button>
-          </div>
+          <div><h1>Harn Kun</h1></div>
           <p>Split any bill, share every expense clearly.</p>
         </header>
 
@@ -2127,13 +2039,21 @@ function App() {
           )}
           {!historyLoading && historyRecords.length === 0 && (
             <BitsSurface className="home-history-empty">
-              <span aria-hidden="true">＋</span>
+              <BitsButton
+                type="button"
+                className="home-create-button home-empty-create-button"
+                aria-label={hasActiveDraft ? 'Resume splitting the current bill' : 'Create a new bill split'}
+                aria-expanded={isCreating}
+                onClick={openPanel}
+              >
+                <span aria-hidden="true">{hasActiveDraft ? '▶' : '+'}</span>
+              </BitsButton>
               <strong>No bills yet</strong>
               <p>Create your first bill split and it will appear here.</p>
             </BitsSurface>
           )}
           {!historyLoading && sortedHistoryRecords.map((record) => (
-            <div className={`home-history-card-shell${removingHistoryId === record.id ? ' is-removing' : ''}`} key={record.id}>
+            <div className={`home-history-card-shell${removingHistoryId === record.id ? ' is-removing' : ''}${homeHistorySwipe.id === record.id ? ' is-swiping' : ''}`} key={record.id}>
               <div
                 className={`home-history-delete-underlay${homeHistorySwipe.id === record.id && homeHistorySwipe.offset < -4 ? ' is-visible' : ''}${homeHistorySwipe.id === record.id && homeHistorySwipe.holding ? ' is-holding' : ''}`}
                 style={{
@@ -2146,7 +2066,11 @@ function App() {
               >
                 <div className="home-history-delete-indicator">
                   <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" /><circle className="delete-progress-ring" cx="22" cy="22" r="19" /></svg>
-                  <span>Delete</span>
+                  <span>
+                    <svg className="delete-trash-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" />
+                    </svg>
+                  </span>
                 </div>
               </div>
               <BitsButton
@@ -2174,15 +2098,17 @@ function App() {
           <div className="history-delete-input-shield" aria-hidden="true" />
         )}
 
-        <BitsButton
-          type="button"
-          className="home-create-button"
-          aria-label={hasActiveDraft ? 'Resume splitting the current bill' : 'Create a new bill split'}
-          aria-expanded={isCreating}
-          onClick={openPanel}
-        >
-          <span aria-hidden="true">{hasActiveDraft ? '▶' : '+'}</span>
-        </BitsButton>
+        {(historyLoading || historyRecords.length > 0) && (
+          <BitsButton
+            type="button"
+            className="home-create-button"
+            aria-label={hasActiveDraft ? 'Resume splitting the current bill' : 'Create a new bill split'}
+            aria-expanded={isCreating}
+            onClick={openPanel}
+          >
+            <span aria-hidden="true">{hasActiveDraft ? '▶' : '+'}</span>
+          </BitsButton>
+        )}
 
         {clearHistoryConfirmOpen && (
           <div className="home-confirm-backdrop" role="presentation" onPointerDown={() => { if (!historyLoading) setClearHistoryConfirmOpen(false); }}>
@@ -2632,7 +2558,7 @@ function App() {
           </BitsSurface>
         </div>
       )}
-    </ClickSpark>
+    </main>
   );
 }
 

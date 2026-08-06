@@ -16,7 +16,7 @@ export default function StaggeredMenu({
     toggleRef.current?.focus();
   };
 
-  const toggleMenu = async () => {
+  const toggleMenu = () => {
     if (isOpen) {
       closeMenu();
       return;
