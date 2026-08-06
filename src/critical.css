@@ -81,6 +81,60 @@ html[data-theme='dark'] .app-version {
   opacity: 0.24;
 }
 
+.network-status-pill {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 20000;
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  color: var(--clay-text, #373348);
+  background: color-mix(in srgb, var(--clay-surface, #e9e5f1) 94%, transparent);
+  box-shadow:
+    0 5px 12px rgba(35, 29, 52, 0.2),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.36);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: network-pill-enter 240ms var(--ease-out) both;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.network-status-pill > span {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--clay-coral, #ff827c);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--clay-coral, #ff827c) 18%, transparent);
+}
+
+.network-status-pill.is-online > span {
+  background: var(--clay-success, #5d9f82);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--clay-success, #5d9f82) 18%, transparent);
+}
+
+@keyframes network-pill-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
 button {
   font: inherit;
   -webkit-tap-highlight-color: transparent;

@@ -28,6 +28,48 @@ const SHARE_QR_OPTIONS = {
 };
 const historyQrCache = new Map();
 
+function NetworkStatusPill() {
+  const startsOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  const [networkNotice, setNetworkNotice] = useState(startsOffline ? 'offline' : null);
+  const wasOfflineRef = useRef(startsOffline);
+
+  useEffect(() => {
+    let hideTimer;
+
+    const showOffline = () => {
+      window.clearTimeout(hideTimer);
+      wasOfflineRef.current = true;
+      setNetworkNotice('offline');
+    };
+
+    const showOnline = () => {
+      if (!wasOfflineRef.current) return;
+      wasOfflineRef.current = false;
+      setNetworkNotice('online');
+      window.clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(() => setNetworkNotice(null), 3200);
+    };
+
+    window.addEventListener('offline', showOffline);
+    window.addEventListener('online', showOnline);
+    return () => {
+      window.clearTimeout(hideTimer);
+      window.removeEventListener('offline', showOffline);
+      window.removeEventListener('online', showOnline);
+    };
+  }, []);
+
+  if (!networkNotice) return null;
+
+  return createPortal(
+    <div className={`network-status-pill is-${networkNotice}`} role="status" aria-live="polite">
+      <span aria-hidden="true" />
+      {networkNotice === 'offline' ? 'You’re offline' : 'Back online'}
+    </div>,
+    document.body,
+  );
+}
+
 async function encodeSharedReceipt(record) {
   const friendIndexes = new Map(record.friends.map((friend, index) => [friend, index]));
   const compactReceipt = {
@@ -1846,6 +1888,7 @@ function App() {
   if (isSharedHistoryRoute) {
     return (
       <main className="shared-receipt-page">
+        <NetworkStatusPill />
         <small className="app-version" title={`Git version from ${APP_VERSION_TIME}`}>{APP_VERSION}</small>
         <section className="shared-receipt-shell" aria-label="Shared bill details">
           <header className="shared-receipt-header">
@@ -1966,6 +2009,7 @@ function App() {
 
   return (
     <main className="app">
+      <NetworkStatusPill />
       <small className="app-version" title={`Git version from ${APP_VERSION_TIME}`}>{APP_VERSION}</small>
       <div className="silk-background" aria-hidden="true" />
 
