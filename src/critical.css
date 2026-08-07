@@ -566,7 +566,7 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
 }
 
 .home-history-delete-underlay.is-holding .delete-progress-ring {
-  animation: history-delete-hold 1.8s linear forwards;
+  animation: history-delete-hold 0.8s linear forwards;
 }
 
 .home-history-delete-indicator span {

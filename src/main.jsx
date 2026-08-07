@@ -228,6 +228,82 @@ const createAutomaticEventName = () => {
   return `Bill · ${dateTime}`;
 };
 
+const RANDOM_HISTORY_EVENTS = ['Team lunch', 'Friday dinner', 'Coffee run', 'Weekend brunch', 'Game night'];
+const RANDOM_HISTORY_FRIENDS = ['Aom', 'Beam', 'Fern', 'Gun', 'May', 'Mint', 'New', 'Palm'];
+const RANDOM_HISTORY_ITEMS = [
+  ['Pad Thai', 80, 140],
+  ['Fried rice', 70, 130],
+  ['Green curry', 110, 180],
+  ['Som tam', 70, 120],
+  ['Grilled chicken', 120, 220],
+  ['Milk tea', 45, 85],
+  ['Iced coffee', 55, 95],
+  ['Mango sticky rice', 90, 150],
+];
+
+const randomInteger = (minimum, maximum) => Math.floor(Math.random() * (maximum - minimum + 1)) + minimum;
+const shuffled = (values) => [...values].sort(() => Math.random() - 0.5);
+
+function createRandomHistoryRecord() {
+  const friends = shuffled(RANDOM_HISTORY_FRIENDS).slice(0, randomInteger(2, 5));
+  const billItems = shuffled(RANDOM_HISTORY_ITEMS).slice(0, randomInteger(2, 6)).map(([name, minimum, maximum]) => ({
+    name,
+    quantity: 1,
+    amount: randomInteger(minimum, maximum),
+  }));
+  const allocations = billItems.map(() => shuffled(friends).slice(0, randomInteger(1, friends.length)));
+  const subtotal = billItems.reduce((sum, item) => sum + item.amount, 0);
+  const vatEnabled = Math.random() < 0.4;
+  const vatRate = vatEnabled ? 7 : 0;
+  const vatAmount = Math.round(subtotal * vatRate) / 100;
+  const discountEnabled = Math.random() < 0.3;
+  const discountAmount = discountEnabled ? randomInteger(1, Math.max(1, Math.min(100, Math.floor(subtotal * 0.12)))) : 0;
+  const total = Math.max(0, Math.round((subtotal + vatAmount - discountAmount) * 100) / 100);
+  const centsByFriend = Object.fromEntries(friends.map((friend) => [friend, 0]));
+
+  billItems.forEach((item, itemIndex) => {
+    const selectedFriends = allocations[itemIndex];
+    const itemCents = Math.round(item.amount * 100);
+    const baseShare = Math.floor(itemCents / selectedFriends.length);
+    const remainder = itemCents % selectedFriends.length;
+    selectedFriends.forEach((friend, friendIndex) => {
+      centsByFriend[friend] += baseShare + (friendIndex < remainder ? 1 : 0);
+    });
+  });
+
+  const assignedCents = Object.values(centsByFriend).reduce((sum, amount) => sum + amount, 0);
+  const targetCents = Math.round(total * 100);
+  const proportional = friends.map((friend) => ({
+    friend,
+    exact: assignedCents > 0 ? centsByFriend[friend] * targetCents / assignedCents : 0,
+  }));
+  const settlementCents = Object.fromEntries(proportional.map(({ friend, exact }) => [friend, Math.floor(exact)]));
+  const distributedCents = Object.values(settlementCents).reduce((sum, amount) => sum + amount, 0);
+  proportional
+    .sort((left, right) => (right.exact - Math.floor(right.exact)) - (left.exact - Math.floor(left.exact)))
+    .slice(0, targetCents - distributedCents)
+    .forEach(({ friend }) => { settlementCents[friend] += 1; });
+
+  const now = Date.now();
+  return {
+    id: globalThis.crypto?.randomUUID?.() || `random-${now}-${Math.random().toString(36).slice(2)}`,
+    eventName: RANDOM_HISTORY_EVENTS[randomInteger(0, RANDOM_HISTORY_EVENTS.length - 1)],
+    friends,
+    billItems,
+    allocations,
+    settlements: friends.map((name) => ({ name, amount: settlementCents[name] / 100 })),
+    subtotal,
+    vatEnabled,
+    vatRate,
+    vatAmount,
+    discountEnabled,
+    discountAmount,
+    total,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 const THAI_DIGITS = { '๐': '0', '๑': '1', '๒': '2', '๓': '3', '๔': '4', '๕': '5', '๖': '6', '๗': '7', '๘': '8', '๙': '9' };
 const SUMMARY_WORDS = /(?:ยอดรวม|รวมมูลค่า|รวมทั้งสิ้น|ยอดสุทธิ|สุทธิ|จำนวน\s*\d*\s*ชิ้น|subtotal|total|vat|ภาษี|service|ค่าบริการ|ส่วนลด|discount|เงินสด|เงินทอน|change|ชำระ)/i;
 const META_WORDS = /(?:ใบเสร็จ|receipt|invoice|tax\s*id|เลขประจำตัว|โทร|tel|โต๊ะ|table|คิว|queue|วันที่|date|เวลา|time|พนักงาน|cashier|pos\s*#|สาขา|บริษัท|line\s*[:@]|powered)/i;
@@ -576,6 +652,7 @@ function App() {
   const cropGestureRef = useRef(null);
   const homeHistorySwipeRef = useRef(null);
   const homeHistoryClickGuardRef = useRef(null);
+  const brandHistoryClickCountRef = useRef(0);
   const sortDrawerRef = useRef(null);
   const billSwipeRef = useRef(null);
   const billListRef = useRef(null);
@@ -877,6 +954,21 @@ function App() {
     setClearHistoryConfirmOpen(true);
   };
 
+  const handleBrandHistoryClick = async () => {
+    brandHistoryClickCountRef.current += 1;
+    if (brandHistoryClickCountRef.current < 10) return;
+    brandHistoryClickCountRef.current = 0;
+
+    const randomRecord = createRandomHistoryRecord();
+    try {
+      await saveHistoryRecord(randomRecord);
+      setHistoryRecords((records) => [randomRecord, ...records]);
+      setHistorySort('newest');
+    } catch (historyError) {
+      console.error('Could not add random history record:', historyError);
+    }
+  };
+
   const confirmClearHistory = async () => {
     setHistoryLoading(true);
     try {
@@ -1005,7 +1097,7 @@ function App() {
     swipe.offset = Math.max(-112, Math.min(0, deltaX));
     if (swipe.offset <= -78 && !swipe.holding) {
       swipe.holding = true;
-      swipe.holdTimer = window.setTimeout(() => completeHeldHistoryDelete(swipe), 1800);
+      swipe.holdTimer = window.setTimeout(() => completeHeldHistoryDelete(swipe), 800);
     } else if (swipe.offset > -78 && swipe.holding) {
       window.clearTimeout(swipe.holdTimer);
       swipe.holding = false;
@@ -2024,7 +2116,7 @@ function App() {
           {theme === 'dark' ? '☀' : '☾'}
         </button>
         <header className="home-header">
-          <div><h1>Harn Kun</h1></div>
+          <div><h1 onClick={handleBrandHistoryClick}>Harn Kun</h1></div>
           <p>Split any bill, share every expense clearly.</p>
         </header>
 
