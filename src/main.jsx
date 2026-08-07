@@ -652,7 +652,6 @@ function App() {
   const cropGestureRef = useRef(null);
   const homeHistorySwipeRef = useRef(null);
   const homeHistoryClickGuardRef = useRef(null);
-  const brandHistoryClickCountRef = useRef(0);
   const sortDrawerRef = useRef(null);
   const billSwipeRef = useRef(null);
   const billListRef = useRef(null);
@@ -955,10 +954,6 @@ function App() {
   };
 
   const handleBrandHistoryClick = async () => {
-    brandHistoryClickCountRef.current += 1;
-    if (brandHistoryClickCountRef.current < 10) return;
-    brandHistoryClickCountRef.current = 0;
-
     const randomRecord = createRandomHistoryRecord();
     try {
       await saveHistoryRecord(randomRecord);
@@ -1056,6 +1051,10 @@ function App() {
 
   const completeHeldHistoryDelete = (swipe) => {
     if (homeHistorySwipeRef.current !== swipe || !swipe.holding || swipe.offset > -78) return;
+    homeHistoryClickGuardRef.current = swipe.id;
+    window.setTimeout(() => {
+      if (homeHistoryClickGuardRef.current === swipe.id) homeHistoryClickGuardRef.current = null;
+    }, 1000);
     homeHistorySwipeRef.current = null;
     setHistoryDeleteInputLocked(true);
 
@@ -1078,6 +1077,10 @@ function App() {
       await new Promise((resolve) => window.setTimeout(resolve, 340));
       await deleteHistoryRecord(record.id);
       setHistoryRecords((records) => records.filter((item) => item.id !== record.id));
+      if (selectedHistory?.id === record.id) {
+        setSelectedHistory(null);
+        setHistoryView(null);
+      }
     } catch (deleteError) {
       console.error('Could not delete history record:', deleteError);
       window.alert('Could not delete this bill. Please try again.');
