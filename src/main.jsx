@@ -20,7 +20,7 @@ const loadAppStyles = () => {
   return appStylesPromise;
 };
 
-const SHARE_HISTORY_URL = 'https://harn-kun.vercel.app/history';
+const SHARE_HISTORY_URL = 'https://harnkun.vercel.app/history';
 const SHARE_QR_OPTIONS = {
   margin: 2,
   errorCorrectionLevel: 'M',
@@ -1830,7 +1830,7 @@ function App() {
       context.fillText('breakdown on any phone', 368, qrTop + 153, 596);
       context.fillStyle = exportColors.subtext;
       context.font = '600 23px "Mali", cursive';
-      context.fillText('harn-kun.vercel.app/history', 368, qrTop + 202, 596);
+      context.fillText('harnkun.vercel.app/history', 368, qrTop + 202, 596);
       context.fillText('Anyone with this QR can view this bill.', 368, qrTop + 240, 596);
 
       context.fillStyle = exportColors.footer;
