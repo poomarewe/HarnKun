@@ -6,6 +6,8 @@ import '@fontsource/mali/600.css';
 import '@fontsource/mali/700.css';
 import { BitsButton, BitsSurface } from './ReactBitsUI';
 import StaggeredMenu from './StaggeredMenu';
+import AdminPanel from './AdminPanel';
+import useVisitorAnalytics from './useVisitorAnalytics';
 import './critical.css';
 import './clay-home.css';
 
@@ -665,6 +667,7 @@ async function deleteHistoryRecord(recordId) {
 }
 
 function App() {
+  useVisitorAnalytics();
   const isSharedHistoryRoute = window.location.pathname === '/history';
   const [theme, setTheme] = useState(() => {
     try {
@@ -2800,4 +2803,5 @@ function App() {
   );
 }
 
-createRoot(document.getElementById('root')).render(<StrictMode><App /></StrictMode>);
+const RootView = window.location.pathname === '/admin' ? AdminPanel : App;
+createRoot(document.getElementById('root')).render(<StrictMode><RootView /></StrictMode>);

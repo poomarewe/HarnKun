@@ -4,8 +4,13 @@ import multer from 'multer';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import analyticsHandler from './api/analytics.js';
+import adminLoginHandler from './api/admin-login.js';
+import adminDashboardHandler from './api/admin-dashboard.js';
+import adminLogoutHandler from './api/admin-logout.js';
 
 const app = express();
+app.set('trust proxy', 1);
 const port = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
 const rootDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -23,6 +28,38 @@ const billUpload = multer({
 const TYPHOON_OCR_PROMPT = `Read this Thai or English receipt. Return only purchased item rows as one clean HTML table with exactly these columns: item, quantity, total price. Keep item names exactly as printed. Exclude the shop header, address, dates, invoice numbers, subtotal, VAT, discounts, payment, cash, change, QR codes, and explanations.`;
 
 app.use(express.json());
+
+function mountWebHandler(route, handler) {
+  app.all(route, async (request, response, next) => {
+    try {
+      const headers = new Headers();
+      Object.entries(request.headers).forEach(([name, value]) => {
+        if (['connection', 'content-length', 'host', 'transfer-encoding'].includes(name)) return;
+        if (Array.isArray(value)) value.forEach((item) => headers.append(name, item));
+        else if (value !== undefined) headers.set(name, value);
+      });
+      const protocol = request.get('x-forwarded-proto')?.split(',')[0]?.trim() || request.protocol;
+      const url = `${protocol}://${request.get('host')}${request.originalUrl}`;
+      const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
+      const webRequest = new Request(url, {
+        method: request.method,
+        headers,
+        body: hasBody ? JSON.stringify(request.body || {}) : undefined,
+      });
+      const webResponse = await handler.fetch(webRequest);
+      webResponse.headers.forEach((value, name) => response.setHeader(name, value));
+      const body = Buffer.from(await webResponse.arrayBuffer());
+      response.status(webResponse.status).send(body);
+    } catch (error) {
+      next(error);
+    }
+  });
+}
+
+mountWebHandler('/api/analytics', analyticsHandler);
+mountWebHandler('/api/admin-login', adminLoginHandler);
+mountWebHandler('/api/admin-dashboard', adminDashboardHandler);
+mountWebHandler('/api/admin-logout', adminLogoutHandler);
 
 function enforceScanCooldown(request, response, next) {
   const clientId = request.ip;

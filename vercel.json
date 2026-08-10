@@ -5,7 +5,28 @@
       "maxDuration": 60
     }
   },
+  "headers": [
+    {
+      "source": "/history",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive"
+        }
+      ]
+    },
+    {
+      "source": "/admin",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive"
+        }
+      ]
+    }
+  ],
   "rewrites": [
-    { "source": "/history", "destination": "/index.html" }
+    { "source": "/history", "destination": "/index.html" },
+    { "source": "/admin", "destination": "/index.html" }
   ]
 }
