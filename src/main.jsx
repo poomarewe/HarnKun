@@ -1,6 +1,7 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import '@fontsource/mali/400.css';
 import '@fontsource/mali/600.css';
 import '@fontsource/mali/700.css';
@@ -2804,4 +2805,15 @@ function App() {
 }
 
 const RootView = window.location.pathname === '/admin' ? AdminPanel : App;
-createRoot(document.getElementById('root')).render(<StrictMode><RootView /></StrictMode>);
+const sanitizeSpeedInsight = (event) => ({
+  ...event,
+  url: event.url.split(/[?#]/, 1)[0],
+  route: window.location.pathname,
+});
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <RootView />
+    <SpeedInsights route={window.location.pathname} beforeSend={sanitizeSpeedInsight} />
+  </StrictMode>,
+);
