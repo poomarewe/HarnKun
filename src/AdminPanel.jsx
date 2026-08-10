@@ -117,7 +117,7 @@ export default function AdminPanel() {
           </a>
           <p className="admin-eyebrow">Private analytics</p>
           <h1 id="admin-login-title">Admin sign in</h1>
-          <p className="admin-intro">Enter the private admin password to view live and historical usage.</p>
+          <p className="admin-intro">Something not Spacial.</p>
           <form onSubmit={handleLogin}>
             <label htmlFor="admin-password">Admin password</label>
             <input
