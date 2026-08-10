@@ -425,6 +425,62 @@ button {
   height: 0;
 }
 
+.home-history-day-group {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.home-history-day-heading {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  display: flex;
+  min-height: 30px;
+  padding: 5px 7px;
+  align-items: center;
+  justify-content: space-between;
+  color: #fb923c;
+  background: transparent;
+}
+
+.home-history-day-heading span {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.48);
+  text-transform: uppercase;
+}
+
+.home-history-day-heading b {
+  display: grid;
+  min-width: 24px;
+  height: 20px;
+  padding: 0 6px;
+  place-items: center;
+  border-radius: 999px;
+  color: #fed7aa;
+  background: rgba(249, 115, 22, 0.18);
+  font-size: 0.62rem;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.42);
+}
+
+html[data-theme='finance'] .home-history-day-heading {
+  color: #c2410c;
+  background: transparent;
+}
+
+html[data-theme='finance'] .home-history-day-heading span {
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.95), 0 2px 5px rgba(15, 23, 42, 0.18);
+}
+
+html[data-theme='finance'] .home-history-day-heading b {
+  color: #9a3412;
+  background: rgba(249, 115, 22, 0.16);
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.9), 0 2px 4px rgba(15, 23, 42, 0.14);
+}
+
 .home-history-card {
   display: grid;
   width: 100%;
@@ -433,10 +489,10 @@ button {
   padding: 15px 16px;
   cursor: pointer;
   text-align: left;
-  grid-template-columns: minmax(0, 1fr) auto 14px;
+  grid-template-columns: 42px minmax(0, 1fr) auto 14px;
   grid-template-rows: auto auto auto;
   align-items: center;
-  gap: 3px 12px;
+  gap: 3px 10px;
   border: 1px solid rgba(181, 168, 218, 0.24);
   border-radius: 18px;
   color: #fff;
@@ -449,6 +505,36 @@ button {
   touch-action: pan-y;
   transition: transform 180ms var(--ease-out), border-color 170ms ease, box-shadow 170ms ease;
 }
+
+.history-card-category {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1 / 4;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 14px;
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.14);
+}
+
+.history-card-category svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.history-card-category.is-food { color: #ea580c; background: rgba(249, 115, 22, 0.15); }
+.history-card-category.is-rent { color: #2563eb; background: rgba(59, 130, 246, 0.15); }
+.history-card-category.is-travel { color: #0891b2; background: rgba(6, 182, 212, 0.15); }
+.history-card-category.is-shopping { color: #9333ea; background: rgba(168, 85, 247, 0.15); }
+.history-card-category.is-utilities { color: #ca8a04; background: rgba(234, 179, 8, 0.16); }
+.history-card-category.is-entertainment { color: #db2777; background: rgba(236, 72, 153, 0.15); }
+.history-card-category.is-health { color: #dc2626; background: rgba(239, 68, 68, 0.15); }
 
 html[data-theme='dark'] .home-dashboard .home-history-card {
   border-color: rgba(181, 168, 218, 0.24);
@@ -617,7 +703,7 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
 }
 
 .home-history-card .history-card-date {
-  grid-column: 1;
+  grid-column: 2;
   color: rgba(255, 255, 255, 0.52);
   font-size: 0.58rem;
   font-weight: 800;
@@ -627,7 +713,7 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
 
 .home-history-card > strong {
   overflow: hidden;
-  grid-column: 1;
+  grid-column: 2;
   color: #fff;
   font-size: 0.92rem;
   text-overflow: ellipsis;
@@ -635,21 +721,21 @@ html[data-theme='dark'] .home-dashboard .home-history-card {
 }
 
 .home-history-card > small {
-  grid-column: 1;
+  grid-column: 2;
   color: rgba(255, 255, 255, 0.58);
   font-size: 0.63rem;
   font-weight: 700;
 }
 
 .home-history-card > b {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1 / 4;
   color: #fff;
   font-size: 0.92rem;
 }
 
 .home-history-card > i {
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 1 / 4;
   color: var(--palette-lavender);
   font-size: 1.4rem;

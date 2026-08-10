@@ -1366,10 +1366,10 @@ input:focus-visible {
   padding: 14px 15px;
   cursor: pointer;
   text-align: left;
-  grid-template-columns: minmax(0, 1fr) auto 14px;
+  grid-template-columns: 42px minmax(0, 1fr) auto 14px;
   grid-template-rows: auto auto auto;
   align-items: center;
-  gap: 3px 12px;
+  gap: 3px 10px;
   border: 1px solid #e2d9e9;
   border-radius: 18px;
   color: #392a46;
@@ -1378,7 +1378,7 @@ input:focus-visible {
 }
 
 .history-card-date {
-  grid-column: 1;
+  grid-column: 2;
   color: #927fa1;
   font-size: 0.59rem;
   font-style: normal;
@@ -1389,28 +1389,28 @@ input:focus-visible {
 
 .history-card > strong {
   overflow: hidden;
-  grid-column: 1;
+  grid-column: 2;
   font-size: 0.94rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .history-card > small {
-  grid-column: 1;
+  grid-column: 2;
   color: #887b91;
   font-size: 0.64rem;
   font-weight: 700;
 }
 
 .history-card > b {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1 / 4;
   color: #6932a7;
   font-size: 1rem;
 }
 
 .history-card > i {
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 1 / 4;
   color: #a086b4;
   font-size: 1.45rem;

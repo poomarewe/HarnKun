@@ -20,7 +20,7 @@ const loadAppStyles = () => {
   return appStylesPromise;
 };
 
-const SHARE_HISTORY_URL = 'https://harnkun.vercel.app/history';
+const SHARE_HISTORY_URL = 'https://harn.fun/history';
 const SHARE_QR_OPTIONS = {
   margin: 2,
   errorCorrectionLevel: 'M',
@@ -307,6 +307,79 @@ function createRandomHistoryRecord() {
 const THAI_DIGITS = { '๐': '0', '๑': '1', '๒': '2', '๓': '3', '๔': '4', '๕': '5', '๖': '6', '๗': '7', '๘': '8', '๙': '9' };
 const SUMMARY_WORDS = /(?:ยอดรวม|รวมมูลค่า|รวมทั้งสิ้น|ยอดสุทธิ|สุทธิ|จำนวน\s*\d*\s*ชิ้น|subtotal|total|vat|ภาษี|service|ค่าบริการ|ส่วนลด|discount|เงินสด|เงินทอน|change|ชำระ)/i;
 const META_WORDS = /(?:ใบเสร็จ|receipt|invoice|tax\s*id|เลขประจำตัว|โทร|tel|โต๊ะ|table|คิว|queue|วันที่|date|เวลา|time|พนักงาน|cashier|pos\s*#|สาขา|บริษัท|line\s*[:@]|powered)/i;
+
+const HISTORY_CATEGORIES = [
+  { key: 'rent', label: 'Rent & home', keywords: ['rent', 'apartment', 'condo', 'housing', 'mortgage', 'landlord', 'ค่าเช่า', 'ห้อง', 'บ้าน', 'คอนโด'] },
+  { key: 'travel', label: 'Travel', keywords: ['travel', 'trip', 'taxi', 'grab', 'bolt', 'train', 'bus', 'flight', 'airline', 'hotel', 'fuel', 'petrol', 'toll', 'parking', 'airport', 'เดินทาง', 'รถ', 'แท็กซี่', 'น้ำมัน', 'ทางด่วน', 'โรงแรม', 'ตั๋ว'] },
+  { key: 'utilities', label: 'Utilities', keywords: ['electric', 'electricity', 'water bill', 'internet', 'wifi', 'phone bill', 'utility', 'mobile plan', 'ค่าไฟ', 'ค่าน้ำ', 'อินเทอร์เน็ต', 'โทรศัพท์'] },
+  { key: 'health', label: 'Health', keywords: ['hospital', 'clinic', 'medicine', 'pharmacy', 'doctor', 'dentist', 'health', 'gym', 'โรงพยาบาล', 'คลินิก', 'ร้านยา', 'หมอ', 'ทันตแพทย์', 'ฟิตเนส'] },
+  { key: 'entertainment', label: 'Entertainment', keywords: ['movie', 'cinema', 'game', 'concert', 'karaoke', 'netflix', 'spotify', 'party', 'หนัง', 'เกม', 'คอนเสิร์ต', 'คาราโอเกะ', 'ปาร์ตี้'] },
+  { key: 'shopping', label: 'Shopping', keywords: ['shopping', 'mall', 'clothes', 'grocery', 'supermarket', 'shoes', 'electronics', 'lazada', 'shopee', 'ช็อป', 'เสื้อ', 'รองเท้า', 'ซื้อของ', 'ห้าง'] },
+  { key: 'food', label: 'Food & drink', keywords: ['food', 'lunch', 'dinner', 'breakfast', 'brunch', 'cafe', 'coffee', 'tea', 'restaurant', 'pizza', 'burger', 'chicken', 'curry', 'rice', 'noodle', 'pad thai', 'som tam', 'meal', 'dessert', 'cake', 'อาหาร', 'ข้าว', 'กาแฟ', 'ชา', 'ขนม', 'ร้านอาหาร', 'ส้มตำ', 'ก๋วยเตี๋ยว'] },
+];
+
+function matchesHistoryKeyword(searchableText, keyword) {
+  if (!/^[a-z0-9 ]+$/i.test(keyword)) return searchableText.includes(keyword);
+  const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return new RegExp(`\\b${escapedKeyword}\\b`, 'i').test(searchableText);
+}
+
+function getHistoryCategory(record) {
+  const searchableText = [record.eventName, ...(record.billItems || []).map((item) => item.name)].join(' ').toLocaleLowerCase();
+  return HISTORY_CATEGORIES.find((category) => category.keywords.some((keyword) => matchesHistoryKeyword(searchableText, keyword)))
+    || { key: 'general', label: 'General expense' };
+}
+
+function HistoryCategoryIcon({ record }) {
+  const category = getHistoryCategory(record);
+  let icon;
+
+  switch (category.key) {
+    case 'food':
+      icon = <><path d="M7 3v7m-3-7v4a3 3 0 0 0 6 0V3M7 10v11M17 3c-2 3-2 7 0 9m0-9v18" /></>;
+      break;
+    case 'rent':
+      icon = <><path d="m3 11 9-8 9 8" /><path d="M5 10v11h14V10M9 21v-7h6v7" /></>;
+      break;
+    case 'travel':
+      icon = <><path d="M22 2 9.5 14.5M22 2l-7 20-4-8-8-4Z" /></>;
+      break;
+    case 'shopping':
+      icon = <><path d="M5 8h14l-1 13H6L5 8Z" /><path d="M9 9V6a3 3 0 0 1 6 0v3" /></>;
+      break;
+    case 'utilities':
+      icon = <><path d="m13 2-7 12h6l-1 8 7-12h-6l1-8Z" /></>;
+      break;
+    case 'entertainment':
+      icon = <><path d="M4 5h16v14H4z" /><path d="m10 9 5 3-5 3Z" /></>;
+      break;
+    case 'health':
+      icon = <><path d="M12 21S4 16.5 4 9.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5C20 16.5 12 21 12 21Z" /><path d="M9 12h6m-3-3v6" /></>;
+      break;
+    default:
+      icon = <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" /><path d="M9 8h6m-6 4h6" /></>;
+  }
+
+  return (
+    <span className={`history-card-category is-${category.key}`} title={category.label} aria-label={category.label}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">{icon}</svg>
+    </span>
+  );
+}
+
+function getHistoryDayStart(timestamp) {
+  const date = new Date(timestamp);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function formatHistoryDayLabel(dayStart) {
+  const today = getHistoryDayStart(Date.now());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dayStart === today) return 'Today';
+  if (dayStart === yesterday.getTime()) return 'Yesterday';
+  return new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(dayStart);
+}
 
 function normalizeThaiDigits(value) {
   return value.replace(/[๐-๙]/g, (digit) => THAI_DIGITS[digit]);
@@ -700,6 +773,17 @@ function App() {
     if (historySort === 'lowest') return records.sort((a, b) => Number(a.total) - Number(b.total));
     return records.sort((a, b) => b.updatedAt - a.updatedAt);
   }, [historyRecords, historySort]);
+
+  const groupedHistoryRecords = useMemo(() => {
+    if (historySort !== 'newest') return [{ dayStart: null, records: sortedHistoryRecords }];
+    const groupsByDay = new Map();
+    sortedHistoryRecords.forEach((record) => {
+      const dayStart = getHistoryDayStart(record.updatedAt);
+      if (!groupsByDay.has(dayStart)) groupsByDay.set(dayStart, { dayStart, records: [] });
+      groupsByDay.get(dayStart).records.push(record);
+    });
+    return [...groupsByDay.values()].sort((left, right) => right.dayStart - left.dayStart);
+  }, [sortedHistoryRecords, historySort]);
 
   useEffect(() => () => {
     window.clearTimeout(homeHistorySwipeRef.current?.holdTimer);
@@ -1925,7 +2009,7 @@ function App() {
       context.fillText('breakdown on any phone', 368, qrTop + 153, 596);
       context.fillStyle = exportColors.subtext;
       context.font = '600 23px "Mali", cursive';
-      context.fillText('harnkun.vercel.app/history', 368, qrTop + 202, 596);
+      context.fillText('Harn.fun/history', 368, qrTop + 202, 596);
       context.fillText('Anyone with this QR can view this bill.', 368, qrTop + 240, 596);
 
       context.fillStyle = exportColors.footer;
@@ -2191,8 +2275,16 @@ function App() {
               <p>Create your first bill split and it will appear here.</p>
             </BitsSurface>
           )}
-          {!historyLoading && sortedHistoryRecords.map((record) => (
-            <div className={`home-history-card-shell${removingHistoryId === record.id ? ' is-removing' : ''}${homeHistorySwipe.id === record.id ? ' is-swiping' : ''}`} key={record.id}>
+          {!historyLoading && groupedHistoryRecords.map((group) => (
+            <section className="home-history-day-group" key={group.dayStart ?? 'all-history'}>
+              {group.dayStart !== null && (
+                <div className="home-history-day-heading">
+                  <span>{formatHistoryDayLabel(group.dayStart)}</span>
+                  <b>{group.records.length}</b>
+                </div>
+              )}
+              {group.records.map((record) => (
+                <div className={`home-history-card-shell${removingHistoryId === record.id ? ' is-removing' : ''}${homeHistorySwipe.id === record.id ? ' is-swiping' : ''}`} key={record.id}>
               <div
                 className={`home-history-delete-underlay${homeHistorySwipe.id === record.id && homeHistorySwipe.offset < -4 ? ' is-visible' : ''}${homeHistorySwipe.id === record.id && homeHistorySwipe.holding ? ' is-holding' : ''}`}
                 style={{
@@ -2222,13 +2314,20 @@ function App() {
                 onPointerCancel={cancelHomeHistorySwipe}
                 onClick={() => openHomeHistoryRecord(record)}
               >
-                <span className="history-card-date">{new Date(record.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                <HistoryCategoryIcon record={record} />
+                <span className="history-card-date">
+                  {historySort === 'newest'
+                    ? new Date(record.updatedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+                    : new Date(record.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
                 <strong>{record.eventName}</strong>
                 <small>{record.friends.length} people · {record.billItems.length} items</small>
                 <b>฿{Number(record.total).toFixed(2)}</b>
                 <i aria-hidden="true">›</i>
               </BitsButton>
-            </div>
+                </div>
+              ))}
+            </section>
           ))}
         </div>
         </section>
