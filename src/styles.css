@@ -368,6 +368,11 @@ input:focus-visible {
   flex: none;
 }
 
+.event-name-field {
+  flex: none;
+  margin-bottom: 16px;
+}
+
 .friend-input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1571,7 +1576,12 @@ input:focus-visible {
 }
 
 .history-download-button {
-  margin-top: 14px;
+  margin-top: 8px;
+}
+
+.history-edit-button {
+  width: 100%;
+  margin-top: 12px;
 }
 
 /* Real mobile keyboards do not always resize 100dvh. Keep the normal panel

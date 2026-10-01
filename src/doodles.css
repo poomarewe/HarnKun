@@ -1,0 +1,247 @@
+:root {
+  --hk-ink: #075243;
+  --hk-mint: #7ce8a2;
+  --hk-yellow: #efff79;
+  --hk-coral: #f46e57;
+  --hk-paper-gray: #e2e7df;
+}
+
+.hk-doodle-field {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hk-doodle-paper {
+  position: absolute;
+  display: block;
+  border-radius: 48% 52% 58% 42% / 55% 43% 57% 45%;
+  background: var(--hk-paper-gray);
+  opacity: .58;
+}
+
+.hk-doodle-paper::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: radial-gradient(rgba(7,82,67,.12) .8px, transparent .9px);
+  background-size: 12px 12px;
+  content: '';
+  opacity: .5;
+}
+
+.hk-doodle-paper--one { width: 100%; height: 100%; }
+.hk-doodle-paper--two { display: none; }
+
+.hk-doodle {
+  position: absolute;
+  display: block;
+  color: var(--hk-ink);
+  transition: transform .32s cubic-bezier(.2,.75,.25,1), opacity .32s ease;
+}
+
+.hk-doodle svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.doodle-line { fill: none; stroke: var(--hk-ink); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.doodle-fill-paper { fill: #f3f5ee; }
+.doodle-fill-yellow { fill: var(--hk-yellow); }
+.doodle-fill-coral { fill: var(--hk-coral); }
+.doodle-fill-mint { fill: var(--hk-mint); }
+.doodle-coral { stroke: var(--hk-coral); }
+.doodle-green { stroke: var(--hk-ink); }
+.doodle-wave-line { stroke-width: 4; }
+
+.hk-doodle-field .hk-doodle-primary { width: clamp(92px, 12vw, 176px); height: auto; aspect-ratio: 1; }
+.hk-doodle-field .hk-doodle-secondary { width: clamp(28px, 3.8vw, 54px); height: auto; aspect-ratio: 1; }
+.hk-doodle-field .hk-doodle-tertiary { width: clamp(48px, 6vw, 88px); height: auto; aspect-ratio: 1; }
+
+/* Home hero: keep the existing receipt illustration as the only art at top right. */
+.app.maggie-app .home-landing-page > .home-hero-doodles {
+  top: 0;
+  right: 0;
+  bottom: auto;
+  left: 0;
+  z-index: 0;
+  height: 100%;
+  max-height: 1000px;
+  overflow: hidden;
+}
+.app.maggie-app .home-header { z-index: 1; }
+.home-hero-doodles .hk-doodle-paper--one {
+  top: 10%;
+  left: -5%;
+  width: min(28vw, 380px);
+  height: min(25vw, 300px);
+  opacity: .24;
+}
+.home-hero-doodles .hk-doodle-paper--two {
+  top: 61%;
+  left: 8%;
+  display: block;
+  width: 130px;
+  height: 86px;
+  opacity: .42;
+}
+.home-hero-doodles .hk-doodle-primary { top: 56%; left: 2.8%; transform: rotate(-10deg); opacity: .82; }
+.home-hero-doodles .hk-doodle-secondary { top: 28%; left: 7%; transform: rotate(8deg); }
+.home-hero-doodles .hk-doodle-tertiary { right: 7%; bottom: 12%; transform: rotate(-8deg); opacity: .85; }
+
+/* Recent Bills: decorations stay in the panel gutters behind its contents. */
+.home-history-panel > .home-history-doodles { opacity: .88; }
+.home-history-doodles .hk-doodle-paper--one { top: 11%; right: -8%; width: min(24vw, 330px); height: min(25vw, 300px); opacity: .48; }
+.home-history-doodles .hk-doodle-paper--two { bottom: 8%; left: -5%; display: block; width: 190px; height: 130px; opacity: .52; }
+.home-history-doodles .hk-doodle-primary { top: 17%; right: 1.3%; transform: rotate(9deg); opacity: .78; }
+.home-history-doodles .hk-doodle-secondary { top: 9%; left: 2.4%; transform: rotate(-9deg); }
+.home-history-doodles .hk-doodle-tertiary { right: 4%; bottom: 11%; transform: rotate(7deg); opacity: .72; }
+
+.home-history-panel > .home-recent-heading,
+.home-history-panel > .home-history-list,
+.home-history-panel > .home-history-footer { position: relative; z-index: 1; }
+.home-history-empty .home-empty-art {
+  width: 54px !important;
+  height: 54px !important;
+  overflow: visible !important;
+  background: transparent !important;
+}
+.home-empty-art svg { width: 100%; height: 100%; }
+.home-empty-art .doodle-fill-paper { fill: var(--hk-paper-gray); }
+
+/* The guided flow keeps the art fixed while each content column scrolls. */
+.guided-flow > .guided-doodle-field {
+  opacity: .88;
+}
+.guided-flow > .guided-doodle-field .hk-doodle-paper--one { top: 23%; right: -7%; width: min(24vw, 320px); height: min(30vw, 360px); opacity: .34; }
+.guided-flow > .guided-doodle-field .hk-doodle-paper--two { bottom: 6%; left: -5%; display: block; width: 170px; height: 120px; opacity: .4; }
+.guided-flow > .guided-doodle-field .hk-doodle-primary { top: 34%; right: 1.5%; transform: rotate(9deg); opacity: .65; }
+.guided-flow > .guided-doodle-field .hk-doodle-secondary { top: 17%; left: 2.5%; transform: rotate(-8deg); }
+.guided-flow > .guided-doodle-field .hk-doodle-tertiary { right: 5%; bottom: 8%; transform: rotate(7deg); opacity: .7; }
+.guided-flow .guided-body { position: relative; z-index: 1; }
+.guided-flow .guided-intro,
+.guided-flow .guided-trail,
+.guided-flow .guided-workspace { position: relative; z-index: 1; }
+.guided-empty-doodle { display: none; }
+
+/* History drawer art is limited to the heading area. */
+.staggered-history-content { position: relative; isolation: isolate; }
+.staggered-history-content > .history-doodles { height: 170px; }
+.history-doodles .hk-doodle-paper--one { top: -52px; right: -92px; width: 210px; height: 170px; opacity: .38; }
+.history-doodles .hk-doodle-primary { top: 18px; right: 12px; width: 56px; transform: rotate(10deg); opacity: .52; }
+.history-doodles .hk-doodle-secondary { top: 90px; right: 54px; width: 28px; opacity: .7; }
+.history-doodles .hk-doodle-tertiary { display: none; }
+.staggered-history-content > :not(.hk-doodle-field) { position: relative; z-index: 1; }
+
+/* The shared receipt stays readable inside its centered paper column. */
+.shared-receipt-page > .shared-receipt-doodles { position: fixed; }
+.shared-receipt-shell { position: relative; z-index: 1; }
+.shared-receipt-doodles .hk-doodle-paper--one { top: 12%; left: -8%; width: min(28vw, 390px); height: min(30vw, 360px); opacity: .54; }
+.shared-receipt-doodles .hk-doodle-paper--two { right: -4%; bottom: 4%; display: block; width: 220px; height: 170px; opacity: .38; }
+.shared-receipt-doodles .hk-doodle-primary { top: 17%; left: 2%; transform: rotate(-8deg); opacity: .58; }
+.shared-receipt-doodles .hk-doodle-secondary { top: 9%; right: 8%; display: none; opacity: .8; }
+.shared-receipt-doodles .hk-doodle-tertiary { right: 3%; bottom: 12%; transform: rotate(8deg); opacity: .64; }
+
+/* Admin art uses the same rounded marks with its matching Harn Kun palette. */
+.admin-shell > .admin-doodles { overflow: hidden; }
+.admin-doodles .hk-doodle-paper--one { top: -7%; left: -7%; width: min(32vw, 420px); height: min(30vw, 350px); opacity: .54; }
+.admin-doodles .hk-doodle-paper--two { right: -4%; bottom: -4%; display: block; width: min(28vw, 340px); height: min(24vw, 270px); opacity: .42; }
+.admin-doodles .hk-doodle-primary { top: 5%; right: 0; transform: rotate(8deg); opacity: .7; }
+.admin-doodles .hk-doodle-secondary { bottom: 9%; left: 5%; display: none; transform: rotate(-9deg); opacity: .8; }
+.admin-doodles .hk-doodle-tertiary { top: 52%; right: 3%; transform: rotate(7deg); opacity: .7; }
+
+/* Only controls or stage changes nudge the art; nothing loops continuously. */
+.app.maggie-app:has(.home-create-primary:hover) .home-hero-doodles .hk-doodle-primary,
+.guided-flow:has(.guided-action:hover) > .guided-doodle-field .hk-doodle-primary,
+.admin-shell:has(button:hover) > .admin-doodles .hk-doodle-primary {
+  transform: translateY(-5px) rotate(3deg);
+}
+
+@media (min-width: 1600px) {
+  .home-history-doodles .hk-doodle-primary,
+  .home-history-doodles .hk-doodle-tertiary,
+  .guided-flow > .guided-doodle-field .hk-doodle-primary,
+  .guided-flow > .guided-doodle-field .hk-doodle-tertiary,
+  .shared-receipt-doodles .hk-doodle-primary,
+  .shared-receipt-doodles .hk-doodle-tertiary,
+  .admin-doodles .hk-doodle-primary,
+  .admin-doodles .hk-doodle-tertiary { display: block; }
+}
+
+@media (max-width: 1599px) {
+  .home-history-doodles .hk-doodle-primary,
+  .home-history-doodles .hk-doodle-tertiary,
+  .guided-flow > .guided-doodle-field .hk-doodle-primary,
+  .guided-flow > .guided-doodle-field .hk-doodle-tertiary,
+  .shared-receipt-doodles .hk-doodle-primary,
+  .shared-receipt-doodles .hk-doodle-secondary,
+  .shared-receipt-doodles .hk-doodle-tertiary,
+  .admin-doodles .hk-doodle-primary,
+  .admin-doodles .hk-doodle-secondary,
+  .admin-doodles .hk-doodle-tertiary { display: none; }
+}
+
+@media (min-width: 1280px) and (max-width: 1599px) {
+  .guided-flow > .guided-doodle-field .hk-doodle-secondary { top: 17%; right: 0; left: auto; width: 34px; }
+}
+
+@media (min-width: 1600px) {
+  .shared-receipt-doodles .hk-doodle-secondary,
+  .admin-doodles .hk-doodle-secondary { display: block; }
+}
+
+@media (max-width: 899px) {
+  .home-hero-doodles .hk-doodle-primary,
+  .home-hero-doodles .hk-doodle-secondary,
+  .home-hero-doodles .hk-doodle-tertiary,
+  .guided-flow > .guided-doodle-field .hk-doodle-primary,
+  .guided-flow > .guided-doodle-field .hk-doodle-secondary,
+  .guided-flow > .guided-doodle-field .hk-doodle-tertiary { display: none; }
+}
+
+@media (max-width: 899px) {
+  .guided-flow > .guided-doodle-field .hk-doodle-primary,
+  .guided-flow > .guided-doodle-field .hk-doodle-secondary,
+  .guided-flow > .guided-doodle-field .hk-doodle-tertiary { display: none; }
+  .guided-flow > .guided-doodle-field .hk-doodle-paper--one { right: -22%; opacity: .2; }
+  .guided-flow > .guided-doodle-field .hk-doodle-paper--two { display: none; }
+  .guided-empty-receipt { position: relative; }
+  .guided-empty-doodle { top: 18px; right: 18px; display: block; width: 42px; height: 42px; }
+  .guided-empty-receipt .guided-prompt { max-width: calc(100% - 48px); }
+}
+
+@media (max-width: 699px) {
+  .app.maggie-app .home-landing-page > .home-hero-doodles {
+    top: 0;
+    height: 100%;
+  }
+  .home-hero-doodles .hk-doodle-paper--one { top: 8%; left: -22%; width: 70vw; height: 45vw; opacity: .2; }
+  .home-hero-doodles .hk-doodle-paper--two,
+  .home-hero-doodles .hk-doodle-primary,
+  .home-hero-doodles .hk-doodle-secondary,
+  .home-hero-doodles .hk-doodle-tertiary,
+  .home-history-doodles .hk-doodle-secondary,
+  .home-history-doodles .hk-doodle-primary,
+  .home-history-doodles .hk-doodle-tertiary,
+  .shared-receipt-doodles .hk-doodle-primary,
+  .shared-receipt-doodles .hk-doodle-tertiary,
+  .admin-doodles .hk-doodle-tertiary { display: none; }
+  .home-history-doodles .hk-doodle-paper--one { top: 5%; right: -35%; width: 60vw; height: 45vw; opacity: .25; }
+  .home-history-doodles .hk-doodle-paper--two,
+  .history-doodles .hk-doodle-paper--one,
+  .admin-doodles .hk-doodle-paper--one,
+  .admin-doodles .hk-doodle-paper--two { display: none; }
+  .home-history-doodles .hk-doodle-secondary { top: 4%; left: auto; right: 4%; width: 26px; }
+  .history-doodles .hk-doodle-primary { top: 15px; right: 4px; width: 32px; opacity: .36; }
+  .shared-receipt-doodles .hk-doodle-secondary { top: 5%; right: 4%; width: 26px; }
+  .admin-doodles .hk-doodle-primary { top: 3%; right: 3%; width: 54px; }
+  .admin-doodles .hk-doodle-secondary { bottom: 3%; left: 3%; width: 34px; }
+  .shared-receipt-doodles .hk-doodle-secondary { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hk-doodle { transition: none !important; }
+  .shared-receipt-page a { transition: none !important; }
+  .app.maggie-app:has(.home-create-primary:hover) .home-hero-doodles .hk-doodle-primary,
+  .guided-flow:has(.guided-action:hover) > .guided-doodle-field .hk-doodle-primary,
+  .admin-shell:has(button:hover) > .admin-doodles .hk-doodle-primary { transform: none; }
+}

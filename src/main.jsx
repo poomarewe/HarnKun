@@ -7,18 +7,25 @@ import '@fontsource/mali/600.css';
 import '@fontsource/mali/700.css';
 import { BitsButton, BitsSurface } from './ReactBitsUI';
 import StaggeredMenu from './StaggeredMenu';
+import GuidedWorkflowView from './GuidedWorkflowView';
+import DoodleField, { Doodle } from './DecorativeDoodles';
 import AdminPanel from './AdminPanel';
 import useVisitorAnalytics from './useVisitorAnalytics';
 import './critical.css';
 import './clay-home.css';
+import './maggie-home.css';
+import './doodles.css';
 
 const APP_VERSION = __APP_VERSION__;
 const APP_VERSION_TIME = __APP_VERSION_TIME__;
+const PHONE_LAYOUT_QUERY = '(max-width: 699px), (pointer: coarse) and (max-height: 600px)';
 let appStylesPromise;
 
 const loadAppStyles = () => {
   if (!appStylesPromise) {
-    appStylesPromise = import('./styles.css').then(() => import('./clay.css'));
+    appStylesPromise = import('./styles.css')
+      .then(() => import('./clay.css'))
+      .then(() => import('./maggie-workflow.css'));
   }
   return appStylesPromise;
 };
@@ -670,13 +677,11 @@ async function deleteHistoryRecord(recordId) {
 function App() {
   useVisitorAnalytics();
   const isSharedHistoryRoute = window.location.pathname === '/history';
-  const [theme, setTheme] = useState(() => {
-    try {
-      return window.localStorage.getItem('harn-kun-theme') === 'dark' ? 'dark' : 'finance';
-    } catch {
-      return 'finance';
-    }
+  const [showIntro, setShowIntro] = useState(() => {
+    if (typeof window === 'undefined' || isSharedHistoryRoute) return false;
+    return true;
   });
+  const theme = 'finance';
   const [isCreating, setIsCreating] = useState(false);
   const [isWorkflowClosing, setIsWorkflowClosing] = useState(false);
   const [hasActiveDraft, setHasActiveDraft] = useState(false);
@@ -688,11 +693,20 @@ function App() {
   const [sortDrawerOpen, setSortDrawerOpen] = useState(false);
   const [clearHistoryConfirmOpen, setClearHistoryConfirmOpen] = useState(false);
   const [menuOpenRequest, setMenuOpenRequest] = useState(0);
+  const [menuCloseRequest, setMenuCloseRequest] = useState(0);
   const [homeHistorySwipe, setHomeHistorySwipe] = useState({ id: null, offset: 0, holding: false });
   const [removingHistoryId, setRemovingHistoryId] = useState(null);
   const [historyDeleteInputLocked, setHistoryDeleteInputLocked] = useState(false);
   const [activeHistoryId, setActiveHistoryId] = useState(null);
   const [step, setStep] = useState('friends');
+  const [peopleNameConfirmed, setPeopleNameConfirmed] = useState(false);
+  const [manualComposerOpen, setManualComposerOpen] = useState(false);
+  const [manualItemName, setManualItemName] = useState('');
+  const [manualItemPrice, setManualItemPrice] = useState('');
+  const [manualQuantity, setManualQuantity] = useState('1');
+  const [showManualQuantity, setShowManualQuantity] = useState(false);
+  const [showBillExtras, setShowBillExtras] = useState(false);
+  const [workflowDirection, setWorkflowDirection] = useState('forward');
   const [eventName, setEventName] = useState('');
   const [friendName, setFriendName] = useState('');
   const [friends, setFriends] = useState([]);
@@ -720,6 +734,7 @@ function App() {
   const [splitIndex, setSplitIndex] = useState(0);
   const [settlements, setSettlements] = useState([]);
   const inputRef = useRef(null);
+  const manualNameRef = useRef(null);
   const cameraInputRef = useRef(null);
   const uploadInputRef = useRef(null);
   const cropWorkspaceRef = useRef(null);
@@ -730,13 +745,21 @@ function App() {
   const homeHistorySwipeRef = useRef(null);
   const homeHistoryClickGuardRef = useRef(null);
   const sortDrawerRef = useRef(null);
-  const billSwipeRef = useRef(null);
+  const homeCreateButtonRef = useRef(null);
   const billListRef = useRef(null);
   const billEditorRef = useRef(null);
   const workflowCloseTimerRef = useRef(null);
+  const pageInteractionBlockersRef = useRef(null);
+  pageInteractionBlockersRef.current = { isCreating, billPhotoOpen, clearHistoryConfirmOpen, historyView };
 
   useEffect(() => {
-    const themeBackground = theme === 'dark' ? '#272432' : '#ebe8f3';
+    if (!showIntro) return undefined;
+    const finishIntro = window.setTimeout(() => setShowIntro(false), 3900);
+    return () => window.clearTimeout(finishIntro);
+  }, [showIntro]);
+
+  useEffect(() => {
+    const themeBackground = '#ffffff';
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
     document.documentElement.style.backgroundColor = themeBackground;
@@ -748,6 +771,235 @@ function App() {
       // The theme still works when storage is unavailable.
     }
   }, [theme]);
+
+  useEffect(() => {
+    if (isSharedHistoryRoute) return undefined;
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    window.scrollTo(0, 0);
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, [isSharedHistoryRoute]);
+
+  useEffect(() => {
+    if (isSharedHistoryRoute) return undefined;
+    let pageState = 'hero';
+    let transitionTimer;
+    let recentTopHoldTimer;
+
+    const recentPage = document.querySelector('.home-history-panel');
+    const appRoot = document.querySelector('.app.maggie-app');
+    if (!recentPage || !appRoot) return undefined;
+
+    const recentList = recentPage.querySelector('.home-history-list');
+    const hasRecentBills = () => Boolean(recentList?.querySelector('.home-history-card'));
+    const getRecentPageTop = () => recentPage.getBoundingClientRect().top + window.scrollY;
+    const setRecentPageMode = (nextMode) => {
+      if (appRoot.classList.contains('is-recent-page') === nextMode) return;
+      const button = homeCreateButtonRef.current;
+      const startRect = button?.getBoundingClientRect();
+      appRoot.classList.toggle('is-recent-page', nextMode);
+      if (!button || !startRect || typeof button.animate !== 'function') return;
+
+      window.requestAnimationFrame(() => {
+        const endRect = button.getBoundingClientRect();
+        const deltaY = startRect.top - endRect.top;
+        const startTransform = nextMode
+          ? `translate(-50%, ${deltaY}px)`
+          : `translateY(${deltaY}px)`;
+        button.animate([
+          { transform: startTransform, width: `${startRect.width}px`, height: `${startRect.height}px` },
+          { transform: nextMode ? 'translateX(-50%)' : 'none', width: `${endRect.width}px`, height: `${endRect.height}px` },
+        ], {
+          duration: 520,
+          easing: 'cubic-bezier(.2, .75, .25, 1)',
+        });
+      });
+    };
+    const scheduleRecentTopReady = () => {
+      window.clearTimeout(recentTopHoldTimer);
+      recentTopHoldTimer = window.setTimeout(() => {
+        if (pageState === 'recent-top-hold') pageState = 'recent-top-ready';
+      }, 500);
+    };
+    const holdAtRecentTop = () => {
+      pageState = 'recent-top-hold';
+      window.clearTimeout(transitionTimer);
+      if (document.scrollingElement) document.scrollingElement.scrollTop = getRecentPageTop();
+      scheduleRecentTopReady();
+    };
+    const enterRecentPage = () => {
+      pageState = 'entering-recent';
+      setRecentPageMode(true);
+      window.scrollTo({ top: getRecentPageTop(), behavior: 'smooth' });
+      transitionTimer = window.setTimeout(() => {
+        if (pageState === 'entering-recent') pageState = 'recent-list';
+      }, 850);
+    };
+    const leaveRecentPage = () => {
+      window.clearTimeout(recentTopHoldTimer);
+      pageState = 'leaving-recent';
+      setRecentPageMode(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      transitionTimer = window.setTimeout(() => {
+        if (pageState === 'leaving-recent') pageState = 'hero';
+      }, 850);
+    };
+    const syncRecentPageMode = () => {
+      if (window.matchMedia(PHONE_LAYOUT_QUERY).matches) return;
+      if (pageState === 'entering-recent' || pageState === 'leaving-recent' || pageState === 'recent-top-hold') return;
+      const recentPageTop = getRecentPageTop();
+      if ((pageState === 'recent-list' || pageState === 'recent-top-ready') && window.scrollY < recentPageTop - 4) {
+        if (recentList && recentList.scrollTop > 1) {
+          if (document.scrollingElement) document.scrollingElement.scrollTop = recentPageTop;
+          return;
+        }
+        holdAtRecentTop();
+        return;
+      }
+      if (pageState === 'recent-top-ready' && window.scrollY > recentPageTop + 4) {
+        pageState = 'recent-list';
+      }
+      if (pageState === 'hero' && window.scrollY >= recentPageTop - 4) {
+        pageState = 'recent-list';
+        setRecentPageMode(true);
+      }
+    };
+
+    const handleViewportResize = () => {
+      if (window.matchMedia(PHONE_LAYOUT_QUERY).matches) {
+        window.clearTimeout(recentTopHoldTimer);
+        pageState = 'hero';
+        appRoot.classList.remove('is-recent-page');
+        window.scrollTo(0, 0);
+        return;
+      }
+      if (pageState === 'entering-recent') {
+        window.clearTimeout(transitionTimer);
+        pageState = 'recent-list';
+      } else if (pageState === 'leaving-recent') {
+        window.clearTimeout(transitionTimer);
+        pageState = 'hero';
+      }
+      const targetTop = pageState === 'hero' ? 0 : getRecentPageTop();
+      if (Math.abs(window.scrollY - targetTop) > 2) {
+        if (document.scrollingElement) document.scrollingElement.scrollTop = targetTop;
+      }
+    };
+
+    pageState = window.scrollY >= getRecentPageTop() - 4 ? 'recent-list' : 'hero';
+    appRoot.classList.toggle('is-recent-page', pageState === 'recent-list');
+
+    const handlePageWheel = (event) => {
+      const blockers = pageInteractionBlockersRef.current;
+      if (window.matchMedia(PHONE_LAYOUT_QUERY).matches || blockers.isCreating || blockers.billPhotoOpen || blockers.clearHistoryConfirmOpen || blockers.historyView) return;
+      if (event.ctrlKey || Math.abs(event.deltaY) < 4) return;
+      if (event.target.closest?.('.staggered-menu-panel, .overlay, .home-confirm-backdrop, .bill-photo-modal-backdrop, .history-qr-modal-backdrop')) return;
+      if (pageState === 'entering-recent' || pageState === 'leaving-recent') {
+        event.preventDefault();
+        return;
+      }
+
+      const recentPageTop = getRecentPageTop();
+      const currentScroll = window.scrollY;
+      const movingDown = event.deltaY > 0;
+      const insideRecentList = hasRecentBills() && event.target.closest?.('.home-history-list');
+
+      if (!movingDown && !insideRecentList && (pageState === 'recent-list' || pageState === 'recent-top-hold' || pageState === 'recent-top-ready')) {
+        event.preventDefault();
+        leaveRecentPage();
+        return;
+      }
+
+      if (pageState === 'recent-top-hold') {
+        if (!movingDown) {
+          event.preventDefault();
+          scheduleRecentTopReady();
+        } else {
+          window.clearTimeout(recentTopHoldTimer);
+          pageState = 'recent-list';
+        }
+        return;
+      }
+
+      if (pageState === 'recent-top-ready') {
+        if (movingDown) {
+          pageState = 'recent-list';
+          return;
+        }
+        if (recentList && recentList.scrollTop > 1) {
+          pageState = 'recent-list';
+          return;
+        }
+        if (currentScroll <= recentPageTop + 48) {
+          event.preventDefault();
+          leaveRecentPage();
+        }
+        return;
+      }
+
+      if (pageState === 'recent-list' && !hasRecentBills() && movingDown && event.target.closest?.('.home-history-panel')) {
+        event.preventDefault();
+        return;
+      }
+
+      if (pageState === 'hero' && movingDown && currentScroll < recentPageTop - 1) {
+        event.preventDefault();
+        enterRecentPage();
+        return;
+      }
+
+      if (pageState === 'recent-list' && !movingDown && (!recentList || recentList.scrollTop <= 1) && currentScroll <= recentPageTop + 48) {
+        event.preventDefault();
+        holdAtRecentTop();
+      }
+    };
+
+    window.addEventListener('wheel', handlePageWheel, { passive: false });
+    window.addEventListener('scroll', syncRecentPageMode, { passive: true });
+    window.addEventListener('resize', handleViewportResize, { passive: true });
+    return () => {
+      window.clearTimeout(transitionTimer);
+      window.clearTimeout(recentTopHoldTimer);
+      window.removeEventListener('wheel', handlePageWheel);
+      window.removeEventListener('scroll', syncRecentPageMode);
+      window.removeEventListener('resize', handleViewportResize);
+      appRoot.classList.remove('is-recent-page');
+    };
+  }, [isSharedHistoryRoute]);
+
+  useEffect(() => {
+    if (isSharedHistoryRoute) return undefined;
+
+    const dashboard = document.querySelector('.home-dashboard');
+    const recentPage = dashboard?.querySelector('.home-history-panel');
+    const appRoot = document.querySelector('.app.maggie-app');
+    if (!dashboard || !recentPage || !appRoot) return undefined;
+
+    const phoneLayout = window.matchMedia(PHONE_LAYOUT_QUERY);
+    const syncPhonePage = () => {
+      if (!phoneLayout.matches) return;
+      const recentTop = recentPage.getBoundingClientRect().top
+        - dashboard.getBoundingClientRect().top + dashboard.scrollTop;
+      appRoot.classList.toggle('is-recent-page', dashboard.scrollTop >= recentTop * 0.5);
+    };
+    const handleLayoutChange = () => {
+      dashboard.scrollTop = 0;
+      if (phoneLayout.matches) {
+        window.scrollTo(0, 0);
+        appRoot.classList.remove('is-recent-page');
+      }
+    };
+
+    dashboard.addEventListener('scroll', syncPhonePage, { passive: true });
+    phoneLayout.addEventListener('change', handleLayoutChange);
+    if (phoneLayout.matches) syncPhonePage();
+    return () => {
+      dashboard.removeEventListener('scroll', syncPhonePage);
+      phoneLayout.removeEventListener('change', handleLayoutChange);
+    };
+  }, [isSharedHistoryRoute]);
 
   useEffect(() => {
     if (!billPhotoOpen) return undefined;
@@ -920,8 +1172,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (isCreating && step === 'friends') inputRef.current?.focus();
-  }, [isCreating, step]);
+    if (isCreating && step === 'friends' && peopleNameConfirmed) inputRef.current?.focus();
+  }, [isCreating, step, peopleNameConfirmed]);
 
   useEffect(() => {
     let active = true;
@@ -939,21 +1191,10 @@ function App() {
 
   useEffect(() => {
     if (editingBillIndex === null) return undefined;
-
-    const scrollEditorToBottom = () => {
-      const list = billListRef.current;
-      if (!list || !billEditorRef.current) return;
-      list.scrollTop = list.scrollHeight;
-    };
-
-    const frame = window.requestAnimationFrame(scrollEditorToBottom);
-    const timers = [120, 320, 600].map((delay) => window.setTimeout(scrollEditorToBottom, delay));
-    window.visualViewport?.addEventListener('resize', scrollEditorToBottom);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      timers.forEach((timer) => window.clearTimeout(timer));
-      window.visualViewport?.removeEventListener('resize', scrollEditorToBottom);
-    };
+    const frame = window.requestAnimationFrame(() => {
+      billEditorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [editingBillIndex]);
 
   useEffect(() => {
@@ -992,6 +1233,7 @@ function App() {
     setCropTransform({ x: 0, y: 0, zoom: 1, rotation: 0 });
     setCropAspect('16:9');
     setBillItems([]);
+    setAllocations([]);
     setVatEnabled(false);
     setVatRate(7);
     setDiscountEnabled(false);
@@ -1018,7 +1260,15 @@ function App() {
 
     await loadAppStyles();
     setActiveHistoryId(null);
+    setWorkflowDirection('forward');
     setStep('friends');
+    setPeopleNameConfirmed(false);
+    setManualComposerOpen(false);
+    setManualItemName('');
+    setManualItemPrice('');
+    setManualQuantity('1');
+    setShowManualQuantity(false);
+    setShowBillExtras(false);
     setEventName(createAutomaticEventName());
     setFriendName('');
     setFriends([]);
@@ -1094,6 +1344,47 @@ function App() {
     setSelectedHistory(record);
     setHistoryView('detail');
     setMenuOpenRequest((request) => request + 1);
+  };
+
+  const editHistoryRecord = async (record) => {
+    if (record.isShared) return;
+
+    await loadAppStyles();
+    window.clearTimeout(workflowCloseTimerRef.current);
+    setIsWorkflowClosing(false);
+    setWorkflowDirection('forward');
+    setSortDrawerOpen(false);
+    setActiveHistoryId(record.id);
+    setEventName(record.eventName);
+    setFriendName('');
+    setFriends([...record.friends]);
+    setStep('friends');
+    setPeopleNameConfirmed(true);
+    setManualComposerOpen(false);
+    setManualItemName('');
+    setManualItemPrice('');
+    setManualQuantity('1');
+    setShowManualQuantity(false);
+    setShowBillExtras(Boolean(record.vatEnabled || record.discountEnabled));
+    resetBill();
+    setBillItems(record.billItems.map((item) => ({ ...item })));
+    setVatEnabled(Boolean(record.vatEnabled));
+    setVatRate(Number(record.vatRate) || 7);
+    setDiscountEnabled(Boolean(record.discountEnabled));
+    setDiscountAmount(Number(record.discountAmount) || 0);
+    setEditingBillIndex(null);
+    setRawOcrText('');
+    setOcrStatus(record.billItems.length > 0 ? 'review' : 'idle');
+    setOcrProgress(0);
+    setAllocations(record.billItems.map((_, index) => [...(record.allocations[index] || [])]));
+    setSplitIndex(0);
+    setSettlements(record.settlements.map((settlement) => ({ ...settlement })));
+    setError('');
+    setHasActiveDraft(true);
+    setIsCreating(true);
+    setHistoryView(null);
+    setSelectedHistory(null);
+    setMenuCloseRequest((request) => request + 1);
   };
 
   useEffect(() => {
@@ -1248,13 +1539,20 @@ function App() {
   };
 
   const removeFriend = (indexToRemove) => {
-    setFriends(friends.filter((_, index) => index !== indexToRemove));
+    const nextFriends = friends.filter((_, index) => index !== indexToRemove);
+    setFriends(nextFriends);
+    setAllocations((current) => current.map((names) => names.filter((name) => nextFriends.includes(name))));
     setError('');
   };
 
   const continueToBill = () => {
+    if (!eventName.trim()) {
+      setError('Add a name for this bill before continuing.');
+      return;
+    }
     if (friends.length < 2) return;
     document.activeElement?.blur();
+    setWorkflowDirection('forward');
     setStep('bill');
     setError('');
   };
@@ -1281,6 +1579,7 @@ function App() {
     if (billImageUrl) URL.revokeObjectURL(billImageUrl);
     setBillImageUrl(URL.createObjectURL(uploadFile));
     setBillItems([]);
+    setAllocations([]);
     setEditingBillIndex(null);
     setRawOcrText('');
     setOcrStatus('scanning');
@@ -1550,65 +1849,42 @@ function App() {
 
   const removeBillItem = (indexToRemove) => {
     setBillItems((currentItems) => currentItems.filter((_, index) => index !== indexToRemove));
+    setAllocations((current) => current.filter((_, index) => index !== indexToRemove));
     setEditingBillIndex((currentIndex) => {
       if (currentIndex === indexToRemove) return null;
       return currentIndex > indexToRemove ? currentIndex - 1 : currentIndex;
     });
   };
 
-  const addManualItem = () => {
-    setEditingBillIndex(billItems.length);
-    setBillItems((currentItems) => [...currentItems, { name: '', quantity: 1, amount: 0 }]);
-    setOcrStatus('review');
-    setError('');
-  };
-
-  const beginBillSwipe = (event, index) => {
-    if (event.pointerType === 'mouse' || editingBillIndex === index) return;
-    billSwipeRef.current = {
-      index,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      element: event.currentTarget,
-      dragging: false,
-    };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-  };
-
-  const moveBillSwipe = (event) => {
-    const swipe = billSwipeRef.current;
-    if (!swipe || swipe.pointerId !== event.pointerId) return;
-    const deltaX = event.clientX - swipe.startX;
-    const deltaY = event.clientY - swipe.startY;
-    if (!swipe.dragging && Math.abs(deltaX) < 8) return;
-    if (!swipe.dragging && Math.abs(deltaY) > Math.abs(deltaX)) return;
-
-    swipe.dragging = true;
-    const offset = Math.max(-88, Math.min(88, deltaX));
-    swipe.element.style.transform = `translate3d(${offset}px, 0, 0)`;
-    swipe.element.classList.toggle('swiping-edit', offset > 0);
-    swipe.element.classList.toggle('swiping-remove', offset < 0);
-  };
-
-  const finishBillSwipe = (event, shouldAct = true) => {
-    const swipe = billSwipeRef.current;
-    if (!swipe || swipe.pointerId !== event.pointerId) return;
-    const deltaX = event.clientX - swipe.startX;
-    if (swipe.element.hasPointerCapture?.(event.pointerId)) {
-      swipe.element.releasePointerCapture(event.pointerId);
+  const addManualItemFromComposer = (event) => {
+    event.preventDefault();
+    const name = manualItemName.trim();
+    const amount = Number(manualItemPrice);
+    const quantity = Number(manualQuantity);
+    if (!name || manualItemPrice === '' || !Number.isFinite(amount) || amount < 0) {
+      setError('Add an item name and a valid price.');
+      return;
     }
-    swipe.element.style.removeProperty('transform');
-    swipe.element.classList.remove('swiping-edit', 'swiping-remove');
-    billSwipeRef.current = null;
-
-    if (!shouldAct || !swipe.dragging) return;
-    if (deltaX <= -68) removeBillItem(swipe.index);
-    if (deltaX >= 68) setEditingBillIndex(swipe.index);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      setError('Quantity must be at least 1.');
+      return;
+    }
+    setBillItems((currentItems) => [...currentItems, { name, quantity, amount: Number(amount.toFixed(2)) }]);
+    setAllocations((current) => [...current, []]);
+    setOcrStatus('review');
+    setManualItemName('');
+    setManualItemPrice('');
+    setManualQuantity('1');
+    setShowManualQuantity(false);
+    setError('');
+    window.requestAnimationFrame(() => manualNameRef.current?.focus());
   };
 
   const startSplitting = () => {
-    const cleanItems = billItems.filter((item) => item.name.trim());
+    const cleanItemEntries = billItems
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item.name.trim());
+    const cleanItems = cleanItemEntries.map(({ item }) => item);
     if (cleanItems.length === 0) {
       setError('Add at least one bill item before splitting.');
       return;
@@ -1616,11 +1892,14 @@ function App() {
 
     setBillItems(cleanItems);
     setEditingBillIndex(null);
-    setAllocations(cleanItems.map(() => []));
+    setAllocations(cleanItemEntries.map(({ index }) => (
+      activeHistoryId ? [...(allocations[index] || [])] : []
+    )));
     setSplitIndex(0);
     setSettlements([]);
     setError('');
     document.activeElement?.blur();
+    setWorkflowDirection('forward');
     setStep('split');
   };
 
@@ -1710,7 +1989,7 @@ function App() {
         discountEnabled,
         discountAmount: appliedDiscount,
         total,
-        createdAt: now,
+        createdAt: historyRecords.find((record) => record.id === historyId)?.createdAt || now,
         updatedAt: now,
       };
 
@@ -1725,6 +2004,7 @@ function App() {
       // The completed operation is already stored in History. Keep its summary
       // visible, but make the next Start action open a clean draft immediately.
       setHasActiveDraft(false);
+      setWorkflowDirection('forward');
       setStep('result');
     } catch (requestError) {
       setError(requestError.message);
@@ -1742,12 +2022,14 @@ function App() {
       finishSplitting();
       return;
     }
+    setWorkflowDirection('forward');
     setSplitIndex((index) => index + 1);
     setError('');
   };
 
   const goToPreviousFood = () => {
     if (splitIndex === 0) return;
+    setWorkflowDirection('backward');
     setSplitIndex((index) => index - 1);
     setError('');
   };
@@ -1764,14 +2046,35 @@ function App() {
       } else if (billImageUrl || ocrStatus === 'review' || billItems.length > 0) {
         resetBill();
       } else {
+        setWorkflowDirection('backward');
         setStep('friends');
       }
     } else if (step === 'split') {
+      setWorkflowDirection('backward');
       if (splitIndex > 0) setSplitIndex((index) => index - 1);
       else setStep('bill');
     } else if (step === 'result') {
       setSplitIndex(Math.max(0, billItems.length - 1));
+      setWorkflowDirection('backward');
       setStep('split');
+    }
+  };
+
+  const guidedGoBack = () => {
+    if (isSaving || ocrStatus === 'scanning') return;
+    setError('');
+    if (step === 'friends') {
+      if (peopleNameConfirmed) setPeopleNameConfirmed(false);
+      else closePanel();
+    } else if (step === 'bill') {
+      if (cameraFlow) closeCameraFlow();
+      else {
+        setWorkflowDirection('backward');
+        setPeopleNameConfirmed(true);
+        setStep('friends');
+      }
+    } else {
+      goBack();
     }
   };
 
@@ -1840,37 +2143,37 @@ function App() {
       const context = canvas.getContext('2d');
       const isDarkExport = theme === 'dark';
       const exportColors = isDarkExport ? {
-        backgroundStart: '#272432',
-        backgroundMiddle: '#302C3E',
-        backgroundEnd: '#1E1B29',
-        glowStart: 'rgba(169, 155, 234, 0.24)',
-        glowEnd: 'rgba(169, 155, 234, 0)',
-        coralStart: 'rgba(255, 146, 141, 0.16)',
-        primary: '#A99BEA',
-        primaryText: '#272432',
-        text: '#F6F2FB',
-        subtext: '#B6AEC3',
-        summary: '#373247',
-        rowA: '#302C3E',
-        rowB: '#373247',
-        footer: '#B6AEC3',
+        backgroundStart: '#212A27',
+        backgroundMiddle: '#2A3530',
+        backgroundEnd: '#18211E',
+        glowStart: 'rgba(138, 199, 156, 0.23)',
+        glowEnd: 'rgba(138, 199, 156, 0)',
+        coralStart: 'rgba(255, 128, 107, 0.16)',
+        primary: '#8AC79C',
+        primaryText: '#212A27',
+        text: '#FFF8E9',
+        subtext: '#C3CBBF',
+        summary: '#303A34',
+        rowA: '#2A3530',
+        rowB: '#303A34',
+        footer: '#C3CBBF',
         shadow: 'rgba(0, 0, 0, 0.34)',
       } : {
-        backgroundStart: '#F0EDF6',
-        backgroundMiddle: '#EBE8F3',
-        backgroundEnd: '#DDD7E9',
-        glowStart: 'rgba(132, 117, 214, 0.24)',
-        glowEnd: 'rgba(132, 117, 214, 0)',
-        coralStart: 'rgba(255, 130, 124, 0.16)',
-        primary: '#8475D6',
+        backgroundStart: '#FFFDF4',
+        backgroundMiddle: '#FFF8E9',
+        backgroundEnd: '#FFEFD0',
+        glowStart: 'rgba(255, 216, 77, 0.3)',
+        glowEnd: 'rgba(255, 216, 77, 0)',
+        coralStart: 'rgba(244, 95, 75, 0.15)',
+        primary: '#F45F4B',
         primaryText: '#FFFFFF',
-        text: '#373348',
-        subtext: '#777087',
-        summary: '#F0EDF6',
-        rowA: '#E9E5F1',
-        rowB: '#E3DEED',
-        footer: '#777087',
-        shadow: 'rgba(76, 65, 101, 0.2)',
+        text: '#252C28',
+        subtext: '#68756C',
+        summary: '#FFF0CC',
+        rowA: '#FFFEFA',
+        rowB: '#FFF4DC',
+        footer: '#68756C',
+        shadow: 'rgba(57, 47, 28, 0.18)',
       };
 
       const fillRoundedRect = (x, y, rectWidth, rectHeight, radius, fillStyle, strokeStyle = null) => {
@@ -1927,7 +2230,7 @@ function App() {
 
       const coralGlow = context.createRadialGradient(80, height - 40, 0, 80, height - 40, 620);
       coralGlow.addColorStop(0, exportColors.coralStart);
-      coralGlow.addColorStop(1, 'rgba(255, 130, 124, 0)');
+      coralGlow.addColorStop(1, 'rgba(244, 95, 75, 0)');
       context.fillStyle = coralGlow;
       context.fillRect(0, Math.max(0, height - 720), 760, 720);
 
@@ -1938,7 +2241,7 @@ function App() {
       context.font = '700 64px "Mali", cursive';
       context.fillText(summaryEventName, 72, 162, 936);
 
-      const exportCardBorder = isDarkExport ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)';
+      const exportCardBorder = isDarkExport ? 'rgba(255, 255, 255, 0.09)' : 'rgba(37, 44, 40, 0.09)';
 
       fillRaisedRoundedRect(72, 202, 936, 102, 25, exportColors.summary, exportCardBorder);
       context.fillStyle = exportColors.subtext;
@@ -2001,7 +2304,7 @@ function App() {
         width: 218,
       });
       fillRaisedRoundedRect(64, qrTop, 952, 280, 28, exportColors.rowA, exportCardBorder);
-      fillRoundedRect(82, qrTop + 15, 250, 250, 22, '#FFFFFF', 'rgba(15, 23, 42, 0.1)');
+      fillRoundedRect(82, qrTop + 15, 250, 250, 22, '#FFFFFF', 'rgba(37, 44, 40, 0.1)');
       context.drawImage(qrCanvas, 98, qrTop + 31, 218, 218);
 
       context.fillStyle = exportColors.primary;
@@ -2054,23 +2357,10 @@ function App() {
     }
   };
 
-  const stepNumber = step === 'friends' ? 1 : 2;
-
-  const toggleTheme = () => {
-    const updateTheme = () => setTheme((current) => current === 'dark' ? 'finance' : 'dark');
-    const useFullPageTransition = window.innerWidth >= 760
-      && !window.matchMedia('(pointer: coarse)').matches
-      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (document.startViewTransition && useFullPageTransition) {
-      document.startViewTransition(updateTheme);
-    } else {
-      updateTheme();
-    }
-  };
-
   if (isSharedHistoryRoute) {
     return (
-      <main className="shared-receipt-page">
+      <main className="shared-receipt-page maggie-shared-screen">
+        <DoodleField variant="shared" className="shared-receipt-doodles" />
         <NetworkStatusPill />
         <small className="app-version" title={`Git version from ${APP_VERSION_TIME}`}>{APP_VERSION}</small>
         <section className="shared-receipt-shell" aria-label="Shared bill details">
@@ -2191,28 +2481,85 @@ function App() {
   }
 
   return (
-    <main className="app">
+    <main className="app maggie-app">
       <NetworkStatusPill />
       <small className="app-version" title={`Git version from ${APP_VERSION_TIME}`}>{APP_VERSION}</small>
       <div className="silk-background" aria-hidden="true" />
 
+      {showIntro && (
+        <div className="desktop-first-visit" aria-hidden="true">
+          <div className="intro-center-word">
+            <span className="intro-letter intro-letter-h">H</span>
+            <span className="intro-letter intro-letter-a" aria-hidden="true">
+              <svg className="intro-a-mascot" viewBox="0 0 100 100" aria-hidden="true">
+                <path className="intro-a-shape" fillRule="evenodd" d="M0 95V25C0 11.2 11.2 0 25 0h50c13.8 0 25 11.2 25 25v70H0Zm44 0V58a6 6 0 0 1 12 0v37H44Z" />
+                <g transform="translate(0 -5)">
+                  <circle className="intro-a-face" cx="36" cy="30" r="6" />
+                  <circle className="intro-a-face" cx="64" cy="30" r="6" />
+                  <path className="intro-a-face" d="M42 38h16c-.5 5-3.7 7.5-8 7.5s-7.5-2.5-8-7.5Z" />
+                </g>
+              </svg>
+            </span>
+            <span className="intro-letter intro-letter-r">R</span>
+            <span className="intro-letter intro-letter-n">N</span>
+          </div>
+        </div>
+      )}
       <section className="home-dashboard" aria-label="Harn Kun home">
-        <button
-          type="button"
-          className="mobile-theme-toggle"
-          onClick={toggleTheme}
-          aria-label={theme === 'dark' ? 'Use light mode' : 'Use dark mode'}
-          aria-pressed={theme === 'dark'}
-        >
-          {theme === 'dark' ? '☀' : '☾'}
-        </button>
+        <section className="home-landing-page" aria-label="Welcome to Harn Kun">
+        <DoodleField variant="hero" className="home-hero-doodles" />
         <header className="home-header">
-          <div><h1 onClick={handleBrandHistoryClick}>Harn Kun</h1></div>
+          <div className="home-brand-row">
+            <svg className="home-brand-mark" viewBox="0 0 36 36" aria-hidden="true">
+              <circle cx="18" cy="18" r="17" />
+              <path d="M10 13h16M10 18h12M10 23h8" />
+              <path className="home-brand-leaf" d="M25 3c1-3 3-4 6-3-1 3-3 4-6 3Z" />
+            </svg>
+            <h1 onClick={handleBrandHistoryClick}>Harn Kun</h1>
+          </div>
           <p>Split any bill, share every expense clearly.</p>
+          <div className="home-hero">
+            <div className="home-hero-copy">
+              <span>LESS MATH. MORE MEMORIES.</span>
+              <h2><span className="mobile-hero-title">Good times.<br /><em>Fair shares.</em></span><span className="desktop-hero-title">GOOD TIMES.<br />FAIR SHARES.</span></h2>
+              <p>Split the bill with your people, minus the awkward math.</p>
+              <div className="home-scroll-cue" aria-hidden="true">
+                <span>Scroll Down</span>
+                <svg viewBox="0 0 20 20"><path d="M10 3v12m-5-5 5 5 5-5" /></svg>
+              </div>
+            </div>
+            <svg className="home-hero-art" viewBox="0 0 112 132" aria-hidden="true">
+              <path className="hero-sun" d="M28 6c10 0 18 8 18 18S38 42 28 42 10 34 10 24 18 6 28 6Z" />
+              <g className="hero-receipt" transform="rotate(8 69 72)">
+                <path d="M42 35h58v78l-6-3-6 4-7-4-6 4-7-4-6 4-7-4-7 4-8-4V35Z" />
+                <path className="receipt-line" d="M52 51h25m-25 10h38m-38 11h31m-31 11h38m-38 11h21" />
+                <path className="receipt-total" d="M52 104h38" />
+              </g>
+              <path className="hero-spark" d="m99 19 2.5 5.5L107 27l-5.5 2.5L99 35l-2.5-5.5L91 27l5.5-2.5L99 19Z" />
+              <path className="hero-leaf" d="M29 47c8-2 13 1 14 8-7 2-12-1-14-8Z" />
+            </svg>
+          </div>
         </header>
+        </section>
+
+        <BitsButton
+          ref={homeCreateButtonRef}
+          type="button"
+          className="home-create-button home-create-featured home-create-primary"
+          aria-label={hasActiveDraft ? 'Resume splitting the current bill' : 'Create a new bill split'}
+          aria-expanded={isCreating}
+          onClick={openPanel}
+        >
+          <span aria-hidden="true">{hasActiveDraft ? '▶' : '+'}</span>
+          <strong>{hasActiveDraft ? 'Continue your bill' : 'Split a bill'}</strong>
+          <small>Add friends, scan, and split in a few taps</small>
+          <b aria-hidden="true">›</b>
+        </BitsButton>
+
 
         <section className="home-history-panel" aria-label="Recent bills">
-        <div className="home-recent-heading">
+          <DoodleField variant="history" className="home-history-doodles" />
+                <div className="home-recent-heading">
           <div><span>ON THIS DEVICE</span><h2>Recent bills</h2></div>
           <div className="home-history-actions">
             <b>{historyRecords.length}</b>
@@ -2251,7 +2598,7 @@ function App() {
           </div>
         </div>
 
-        <div className="home-history-list" aria-live="polite">
+        <div className={`home-history-list${!historyLoading && historyRecords.length === 0 ? ' is-empty' : ''}`} aria-live="polite">
           {historyLoading && (
             <div className="home-history-skeleton" role="status" aria-label="Loading recent bills">
               {[0, 1, 2].map((item) => (
@@ -2266,17 +2613,13 @@ function App() {
           )}
           {!historyLoading && historyRecords.length === 0 && (
             <BitsSurface className="home-history-empty">
-              <BitsButton
-                type="button"
-                className="home-create-button home-empty-create-button"
-                aria-label={hasActiveDraft ? 'Resume splitting the current bill' : 'Create a new bill split'}
-                aria-expanded={isCreating}
-                onClick={openPanel}
-              >
-                <span aria-hidden="true">{hasActiveDraft ? '▶' : '+'}</span>
-              </BitsButton>
-              <strong>No bills yet</strong>
-              <p>Create your first bill split and it will appear here.</p>
+              <Doodle kind="plate" className="home-empty-art" />
+              <div className="home-history-empty-copy">
+                <span>READY WHEN YOU ARE</span>
+                <strong>No bills yet</strong>
+                <p>Create your first bill split and it will appear here.</p>
+              </div>
+              <BitsButton type="button" className="home-empty-create-button" onClick={openPanel}>Create your first bill <span aria-hidden="true">→</span></BitsButton>
             </BitsSurface>
           )}
           {!historyLoading && groupedHistoryRecords.map((group) => (
@@ -2325,6 +2668,13 @@ function App() {
                     : new Date(record.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
                 <strong>{record.eventName}</strong>
+                <span className="history-card-people" aria-hidden="true">
+                  {record.friends.slice(0, 3).map((friend, index) => {
+                    const initials = friend.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+                    return <span key={`${friend}-${index}`} title={friend}>{initials || '?'}</span>;
+                  })}
+                  {record.friends.length > 3 && <span className="history-card-people-more">+{record.friends.length - 3}</span>}
+                </span>
                 <small>{record.friends.length} people · {record.billItems.length} items</small>
                 <b>฿{Number(record.total).toFixed(2)}</b>
                 <i aria-hidden="true">›</i>
@@ -2334,22 +2684,23 @@ function App() {
             </section>
           ))}
         </div>
+        <footer className="home-history-footer" aria-label="Harn Kun footer">
+          <div className="home-history-footer-brand">
+            <svg className="home-history-footer-mark" viewBox="0 0 36 36" aria-hidden="true">
+              <circle cx="18" cy="18" r="17" />
+              <path d="M10 13h16M10 18h12M10 23h8" />
+            </svg>
+            <div>
+              <strong>Harn Kun</strong>
+              <span>Good times, shared fairly.</span>
+            </div>
+          </div>
+          <small>© {new Date().getFullYear()} Harn Kun</small>
+        </footer>
         </section>
 
         {historyDeleteInputLocked && (
           <div className="history-delete-input-shield" aria-hidden="true" />
-        )}
-
-        {(historyLoading || historyRecords.length > 0) && (
-          <BitsButton
-            type="button"
-            className="home-create-button"
-            aria-label={hasActiveDraft ? 'Resume splitting the current bill' : 'Create a new bill split'}
-            aria-expanded={isCreating}
-            onClick={openPanel}
-          >
-            <span aria-hidden="true">{hasActiveDraft ? '▶' : '+'}</span>
-          </BitsButton>
         )}
 
         {clearHistoryConfirmOpen && (
@@ -2372,15 +2723,22 @@ function App() {
 
       <StaggeredMenu
         openRequest={menuOpenRequest}
+        closeRequest={menuCloseRequest}
         onClose={closeHistory}
       >
         {historyView && (
           <div className="staggered-history-content">
+            <DoodleField variant="drawer" className="history-doodles" />
             <div className="panel-heading history-panel-heading">
               <div>
                 <div className="panel-meta"><span>{selectedHistory?.isShared ? 'SHARED RECEIPT' : 'ON THIS DEVICE'}</span></div>
                 <h2>{historyView === 'detail' ? selectedHistory?.eventName : 'History'}</h2>
               </div>
+              {historyView === 'detail' && selectedHistory && !selectedHistory.isShared && (
+                <BitsButton type="button" className="history-edit-icon-button" onClick={() => editHistoryRecord(selectedHistory)} aria-label="Edit this bill" title="Edit this bill">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.2 5.8 4 4M4 20l4.3-.9L19 8.4a2.1 2.1 0 0 0-3-3L5.3 16.1 4 20Z" /></svg>
+                </BitsButton>
+              )}
             </div>
 
             {historyView === 'detail' && selectedHistory && (
@@ -2431,375 +2789,27 @@ function App() {
         document.body,
       )}
 
-      {isCreating && (
-        <div className={`overlay${isWorkflowClosing ? ' is-closing' : ''}`} role="presentation" onMouseDown={closePanel}>
-          <BitsSurface as="section" className={`operation-panel step-${step}`} aria-label="New operation" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="panel-handle" />
-            <div className="panel-heading">
-              {step !== 'friends' && (
-                <BitsButton
-                  type="button"
-                  className="small-back-button"
-                  aria-label="Back"
-                  disabled={isSaving || ocrStatus === 'scanning'}
-                  onClick={goBack}
-                >
-                  ←
-                </BitsButton>
-              )}
-              <div className="panel-heading-content">
-                <div className="panel-meta">
-                  <span>
-                    {step === 'split' ? `ITEM ${splitIndex + 1} OF ${billItems.length}` : step === 'result' ? 'ALL DONE' : `STEP ${stepNumber} OF 2`}
-                  </span>
-                </div>
-                {step === 'friends' && (
-                  <div className="friends-title">
-                    <h2>Add people to <strong>{eventName}</strong></h2>
-                  </div>
-                )}
-                {step === 'bill' && <h2>Scan your bill</h2>}
-                {step === 'split' && <h2>Who shared this item?</h2>}
-                {step === 'result' && <h2>Payment summary</h2>}
-              </div>
-              <BitsButton type="button" className="close-button" onClick={closePanel} aria-label="Close">×</BitsButton>
-            </div>
-
-            {step === 'friends' && (
-              <div className="friends-step">
-                <form className="friend-form" autoComplete="off" data-form-type="other" onSubmit={addFriend}>
-                  <label htmlFor="friend-name">Person's name</label>
-                  <div className="friend-input-row">
-                    <input ref={inputRef} id="friend-name" name="friend-name-entry" value={friendName} onChange={(event) => setFriendName(event.target.value)} type="text" placeholder="Type a name" autoComplete="off" data-form-type="other" data-lpignore="true" enterKeyHint="done" maxLength="60" disabled={friends.length >= 100} />
-                    <BitsButton type="submit" className="add-button" disabled={!friendName.trim() || friends.length >= 100}>Add</BitsButton>
-                  </div>
-                </form>
-
-                <div className="friends-heading"><span>People</span><strong>{friends.length} / 100</strong></div>
-                <div className="friend-list" aria-live="polite">
-                  {friends.length === 0 ? <p className="empty-list">Add at least 2 people to continue.</p> : friends.map((friend, index) => (
-                    <BitsButton key={`${friend}-${index}`} type="button" className="friend-chip" onClick={() => removeFriend(index)}>
-                      <span>{friend}</span><b aria-label={`Remove ${friend}`}>×</b>
-                    </BitsButton>
-                  ))}
-                </div>
-
-                {error && <p className="form-error" role="alert">{error}</p>}
-                <BitsButton className="save-button apply-button" type="button" disabled={friends.length < 2} onClick={continueToBill}>
-                  {friends.length < 2 ? `Add ${2 - friends.length} more` : 'Continue to bill'}
-                </BitsButton>
-              </div>
-            )}
-
-            {step === 'bill' && (
-              <div className="bill-step">
-                <input ref={cameraInputRef} className="hidden-file-input" type="file" accept="image/*" capture="environment" onChange={chooseCameraBill} />
-                <input ref={uploadInputRef} className="hidden-file-input" type="file" accept="image/*" onChange={chooseBill} />
-
-                {cameraFlow && (
-                  <div className="mobile-camera-flow is-editor" role="dialog" aria-modal="true" aria-label="Crop bill photo">
-                    <p className="camera-editor-copy"><strong>Adjust your photo</strong><span>Drag with one finger and pinch with two fingers until only the bill items are inside the box.</span></p>
-                    <div
-                      ref={cropWorkspaceRef}
-                      className="camera-crop-workspace"
-                      onPointerDown={beginCropDrag}
-                      onPointerMove={moveCropDrag}
-                      onPointerUp={endCropDrag}
-                      onPointerCancel={endCropDrag}
-                      onWheel={zoomCropWithWheel}
-                    >
-                      <BitsButton
-                        type="button"
-                        className="crop-aspect-toggle"
-                        style={{ position: 'absolute', top: '12px', right: '12px', left: 'auto', insetInlineStart: 'auto', insetInlineEnd: '12px' }}
-                        aria-label={`Switch crop frame to ${cropAspect === '16:9' ? '9 by 16 portrait' : '16 by 9 landscape'}`}
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={toggleCropAspect}
-                      >
-                        <span>{cropAspect}</span>
-                      </BitsButton>
-                      {!cropBaseSize.width && <div className="camera-photo-skeleton" role="status" aria-label="Preparing photo"><span /></div>}
-                      <img
-                        ref={cropImageRef}
-                        src={pendingCameraUrl}
-                        alt="Bill to crop"
-                        draggable="false"
-                        onLoad={() => window.requestAnimationFrame(initializeCropEditor)}
-                        style={{
-                          width: `${cropBaseSize.width}px`,
-                          height: `${cropBaseSize.height}px`,
-                          transform: `translate(-50%, -50%) translate3d(${cropTransform.x}px, ${cropTransform.y}px, 0) rotate(${cropTransform.rotation}deg) scale(${cropTransform.zoom})`,
-                        }}
-                      />
-                      <div ref={cropFrameRef} className={`camera-crop-frame${cropAspect === '9:16' ? ' is-portrait' : ''}`} aria-hidden="true" />
-                    </div>
-                    <div className="camera-confirm-actions">
-                      <BitsButton type="button" disabled={isCropping} onClick={() => (cameraFlow === 'upload' ? uploadInputRef : cameraInputRef).current?.click()}>{cameraFlow === 'upload' ? 'Choose again' : 'Retake'}</BitsButton>
-                      <BitsButton type="button" className="camera-confirm-button" disabled={!cropBaseSize.width || isCropping} onClick={confirmCameraBill}>{isCropping ? 'Preparing…' : 'Confirm'}</BitsButton>
-                    </div>
-                  </div>
-                )}
-
-                {!cameraFlow && billImageUrl && (
-                  <BitsSurface className={`bill-preview${ocrStatus === 'scanning' ? ' is-scanning' : ''}`}>
-                    <button type="button" className="bill-preview-image-button" onClick={() => setBillPhotoOpen(true)} aria-label="View bill photo full screen">
-                      <img src={billImageUrl} alt="Selected bill" />
-                    </button>
-                    <div><strong>{ocrStatus === 'scanning' ? 'Reading your bill…' : 'Bill photo'}</strong><span></span></div>
-                    {ocrStatus !== 'scanning' && (
-                      <BitsButton type="button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
-                        {cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'Change'}
-                      </BitsButton>
-                    )}
-                  </BitsSurface>
-                )}
-
-                {!cameraFlow && (ocrStatus === 'scanning' ? (
-                  <BitsSurface className="scan-progress" aria-live="polite">
-                    <div><span style={{ width: `${Math.round(ocrProgress * 100)}%` }} /></div>
-                    <p>กำลังอ่านใบเสร็จ… {Math.round(ocrProgress * 100)}%</p>
-                    <div className="scan-result-skeleton" aria-hidden="true">
-                      {[0, 1, 2].map((item) => (
-                        <div key={item}><i /><span /><b /></div>
-                      ))}
-                    </div>
-                  </BitsSurface>
-                ) : (
-                  <>
-                    {!billImageUrl && ocrStatus === 'idle' && (
-                      <div className="scan-start-options">
-                        <BitsButton type="button" disabled={cooldownRemaining > 0} onClick={startCameraFlow}>
-                          <span className="scan-option-icon" aria-hidden="true">●</span>
-                          <span><strong>{cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'Take picture'}</strong><small>Open your phone camera</small></span>
-                          <b aria-hidden="true">›</b>
-                        </BitsButton>
-                        <BitsButton type="button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
-                          <span className="scan-option-icon upload-icon" aria-hidden="true">↑</span>
-                          <span><strong>Upload photo</strong><small>Choose a bill from your device</small></span>
-                          <b aria-hidden="true">›</b>
-                        </BitsButton>
-                        <BitsButton type="button" onClick={addManualItem}>
-                          <span className="scan-option-icon manual-icon" aria-hidden="true">+</span>
-                          <span><strong>Manual add</strong><small>Enter bill items and amounts yourself</small></span>
-                          <b aria-hidden="true">›</b>
-                        </BitsButton>
-                      </div>
-                    )}
-
-                    {(ocrStatus === 'review' || billItems.length > 0) && (
-                      <>
-                        <div className={`bill-list-heading${editingBillIndex !== null ? ' is-editing' : ''}`}>
-                          <span>Items detected</span>
-                          <strong>{billItems.length} items</strong>
-                          {editingBillIndex === null && <small className="bill-swipe-hint">Swipe right to edit · left to remove</small>}
-                        </div>
-                        {editingBillIndex === null && (
-                          <div className="bill-column-headings" aria-hidden="true">
-                            <span>Name</span><span>Quantity</span><span>Price</span><span />
-                          </div>
-                        )}
-                        <div className="bill-list" ref={billListRef}>
-                          {billItems.map((item, index) => {
-                            const isEditing = editingBillIndex === index;
-                            return (
-                              <div className={`bill-item-shell${isEditing ? ' is-editing' : ''}`} key={`bill-item-${index}`}>
-                                <div className="bill-swipe-underlay" aria-hidden="true">
-                                  <span>Edit</span><span>Remove</span>
-                                </div>
-                                {isEditing ? (
-                                  <BitsSurface className="bill-item bill-item-editor" ref={billEditorRef}>
-                                    <label className="bill-field bill-field-name">
-                                      <span>Name</span>
-                                      <input autoFocus aria-label={`Item ${index + 1}`} name={`food-name-${index}`} value={item.name} onChange={(event) => updateBillItem(index, 'name', event.target.value)} placeholder="Item or expense" autoComplete="off" data-form-type="other" data-lpignore="true" />
-                                    </label>
-                                    <label className="bill-field bill-field-quantity">
-                                      <span>Quantity</span>
-                                      <input aria-label={`Quantity ${index + 1}`} name={`food-quantity-${index}`} type="number" min="1" inputMode="numeric" value={item.quantity} autoComplete="off" data-form-type="other" data-lpignore="true" onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'quantity', event.target.value)} />
-                                    </label>
-                                    <label className="bill-field bill-field-amount">
-                                      <span>Price</span>
-                                      <input aria-label={`Amount ${index + 1}`} name={`food-price-${index}`} type="number" min="0" step="0.01" inputMode="decimal" value={item.amount} autoComplete="off" data-form-type="other" data-lpignore="true" onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'amount', event.target.value)} />
-                                    </label>
-                                    <div className="bill-edit-actions">
-                                      <BitsButton className="bill-delete-button" type="button" onClick={() => removeBillItem(index)}>Delete</BitsButton>
-                                      <BitsButton className="bill-done-button" type="button" onClick={() => setEditingBillIndex(null)}>Done</BitsButton>
-                                    </div>
-                                  </BitsSurface>
-                                ) : (
-                                  <BitsSurface
-                                    as="article"
-                                    className="bill-item bill-item-compact"
-                                    onPointerDown={(event) => beginBillSwipe(event, index)}
-                                    onPointerMove={moveBillSwipe}
-                                    onPointerUp={finishBillSwipe}
-                                    onPointerCancel={(event) => finishBillSwipe(event, false)}
-                                  >
-                                    <strong className="bill-item-name">{item.name || 'Unnamed item'}</strong>
-                                    <span className="bill-item-quantity">{Number(item.quantity) || 1}</span>
-                                    <strong className="bill-item-price">฿{(Number(item.amount) || 0).toFixed(2)}</strong>
-                                    <BitsButton className="bill-edit-button" type="button" onClick={() => setEditingBillIndex(index)} aria-label={`Edit ${item.name || 'item'}`}>Edit</BitsButton>
-                                  </BitsSurface>
-                                )}
-                              </div>
-                            );
-                          })}
-                          {editingBillIndex === null && (
-                            <BitsButton type="button" className="manual-item-button bill-list-add-button" onClick={addManualItem}>+ Add item manually</BitsButton>
-                          )}
-                        </div>
-                      </>
-                    )}
-
-                    {billImageUrl && ocrStatus === 'idle' && (
-                      <div className="scan-actions">
-                        <BitsButton type="button" className="upload-button" disabled={cooldownRemaining > 0} onClick={() => uploadInputRef.current?.click()}>
-                          {cooldownRemaining > 0 ? `Try again in ${cooldownRemaining}s` : 'Try another photo'}
-                        </BitsButton>
-                      </div>
-                    )}
-                  </>
-                ))}
-
-                {!cameraFlow && error && <p className="form-error" role="alert">{error}</p>}
-                {!cameraFlow && ocrStatus !== 'scanning' && (
-                  <div className="bill-footer-actions">
-                    {(ocrStatus === 'review' || billItems.length > 0) && (
-                      <>
-                        <BitsSurface className="bill-adjustments" aria-label="Bill adjustments">
-                          <div
-                            className={`bill-adjustment-row${vatEnabled ? ' is-enabled' : ''}`}
-                            role="checkbox"
-                            aria-checked={vatEnabled}
-                            tabIndex="0"
-                            onClick={() => setVatEnabled((enabled) => !enabled)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                setVatEnabled((enabled) => !enabled);
-                              }
-                            }}
-                          >
-                            <div className="bill-adjustment-toggle">
-                              <input type="checkbox" checked={vatEnabled} readOnly tabIndex="-1" aria-hidden="true" />
-                              <span className="bill-adjustment-check" aria-hidden="true">✓</span>
-                              <span><strong>VAT</strong><small>Add tax to the subtotal</small></span>
-                            </div>
-                            <label className="bill-adjustment-input" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => { event.stopPropagation(); if (!vatEnabled) setVatEnabled(true); }}>
-                              <input aria-label="VAT percentage" type="number" min="0" max="100" step="0.01" inputMode="decimal" value={vatRate} disabled={!vatEnabled} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => setVatRate(event.target.value)} />
-                              <span>%</span>
-                            </label>
-                          </div>
-                          <div
-                            className={`bill-adjustment-row${discountEnabled ? ' is-enabled' : ''}`}
-                            role="checkbox"
-                            aria-checked={discountEnabled}
-                            tabIndex="0"
-                            onClick={() => setDiscountEnabled((enabled) => !enabled)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                setDiscountEnabled((enabled) => !enabled);
-                              }
-                            }}
-                          >
-                            <div className="bill-adjustment-toggle">
-                              <input type="checkbox" checked={discountEnabled} readOnly tabIndex="-1" aria-hidden="true" />
-                              <span className="bill-adjustment-check" aria-hidden="true">✓</span>
-                              <span><strong>Discount</strong><small>Subtract a fixed amount</small></span>
-                            </div>
-                            <label className="bill-adjustment-input" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => { event.stopPropagation(); if (!discountEnabled) setDiscountEnabled(true); }}>
-                              <span>฿</span>
-                              <input aria-label="Discount in baht" type="number" min="0" step="0.01" inputMode="decimal" value={discountAmount} disabled={!discountEnabled} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => setDiscountAmount(event.target.value)} />
-                            </label>
-                          </div>
-                        </BitsSurface>
-                        <BitsSurface className="bill-total">
-                          <span>TOTAL</span>
-                          <div className="bill-total-breakdown">
-                            <small>Subtotal ฿{subtotal.toFixed(2)}</small>
-                            {vatEnabled && <small>VAT {Math.max(0, Number(vatRate) || 0)}% +฿{vatAmount.toFixed(2)}</small>}
-                            {discountEnabled && <small>Discount −฿{appliedDiscount.toFixed(2)}</small>}
-                          </div>
-                          <strong>฿{total.toFixed(2)}</strong>
-                        </BitsSurface>
-                        <BitsButton className="save-button" type="button" disabled={!billItems.some((item) => item.name.trim())} onClick={startSplitting}>Confirm & split</BitsButton>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {step === 'split' && billItems[splitIndex] && (
-              <div className="split-step">
-                <BitsSurface className="split-food-card">
-                  <span>ITEM</span>
-                  <h3>{billItems[splitIndex].name}</h3>
-                  <div>
-                    <small>Quantity {billItems[splitIndex].quantity}</small>
-                    <strong>฿{Number(billItems[splitIndex].amount).toFixed(2)}</strong>
-                  </div>
-                </BitsSurface>
-
-                <div className="payer-heading">
-                  <span>Who needs to pay?</span>
-                  <div>
-                    <strong>{(allocations[splitIndex] || []).length} selected</strong>
-                    <BitsButton type="button" className="select-all-button" onClick={toggleAllFriendsForItem}>
-                      {(allocations[splitIndex] || []).length === friends.length ? 'Clear all' : 'Select all'}
-                    </BitsButton>
-                  </div>
-                </div>
-
-                <div className="payer-list">
-                  {friends.map((friend) => {
-                    const isSelected = (allocations[splitIndex] || []).includes(friend);
-                    return (
-                      <BitsButton key={friend} type="button" className={`payer-option${isSelected ? ' selected' : ''}`} aria-pressed={isSelected} onClick={() => toggleFriendForItem(friend)}>
-                        <span className="payer-check" aria-hidden="true">{isSelected ? '✓' : ''}</span>
-                        <strong>{friend}</strong>
-                        {isSelected && <small>฿{(Number(billItems[splitIndex].amount) / (allocations[splitIndex] || []).length).toFixed(2)}</small>}
-                      </BitsButton>
-                    );
-                  })}
-                </div>
-
-                {error && <p className="form-error" role="alert">{error}</p>}
-                <div className="split-navigation">
-                  <BitsButton type="button" className="previous-button" disabled={splitIndex === 0 || isSaving} onClick={goToPreviousFood}>Previous</BitsButton>
-                  <BitsButton type="button" className="next-button" disabled={(allocations[splitIndex] || []).length === 0 || isSaving} onClick={goToNextFood}>
-                    {isSaving ? 'Calculating…' : splitIndex === billItems.length - 1 ? 'Calculate' : 'Next item'}
-                  </BitsButton>
-                </div>
-              </div>
-            )}
-
-            {step === 'result' && (
-              <div className="result-step">
-                <BitsSurface className="result-event">
-                  <span>BILL</span>
-                  <strong>{eventName}</strong>
-                  <small>Total ฿{total.toFixed(2)}</small>
-                </BitsSurface>
-
-                <div className="settlement-list">
-                  {settlements.map((settlement, index) => (
-                    <BitsSurface className="settlement-row" key={settlement.name}>
-                      <span>{index + 1}</span>
-                      <strong>{settlement.name}</strong>
-                      <b>฿{settlement.amount.toFixed(2)}</b>
-                    </BitsSurface>
-                  ))}
-                </div>
-
-                {error && <p className="form-error" role="alert">{error}</p>}
-                <BitsButton type="button" className="download-button" onClick={() => downloadSummary()}>Download as picture</BitsButton>
-                <BitsButton type="button" className="done-button" onClick={finishOperation}>Done</BitsButton>
-              </div>
-            )}
-          </BitsSurface>
-        </div>
-      )}
+      {isCreating && <GuidedWorkflowView flow={{
+        BitsButton, BitsSurface, isWorkflowClosing, workflowDirection, step, splitIndex,
+        eventName, friendName, friends, error, billItems, billImageUrl, ocrStatus,
+        ocrProgress, cooldownRemaining, cameraFlow, pendingCameraUrl, cropAspect,
+        cropBaseSize, cropTransform, isCropping, editingBillIndex, vatEnabled, vatRate,
+        discountEnabled, discountAmount, subtotal, vatAmount, appliedDiscount, total,
+        allocations, isSaving, settlements, peopleNameConfirmed, manualComposerOpen,
+        manualItemName, manualItemPrice, manualQuantity, showManualQuantity, showBillExtras,
+        inputRef, manualNameRef, cameraInputRef, uploadInputRef, cropWorkspaceRef,
+        cropFrameRef, cropImageRef, billListRef, billEditorRef,
+        closePanel, closeCameraFlow, guidedGoBack, setEventName, setFriendName, addFriend, removeFriend,
+        setPeopleNameConfirmed, continueToBill, startCameraFlow, chooseCameraBill,
+        chooseBill, beginCropDrag, moveCropDrag, endCropDrag, zoomCropWithWheel,
+        toggleCropAspect, initializeCropEditor, confirmCameraBill, setBillPhotoOpen,
+        setManualComposerOpen, setManualItemName, setManualItemPrice, setManualQuantity,
+        setShowManualQuantity, setShowBillExtras, addManualItemFromComposer,
+        setEditingBillIndex, updateBillItem, removeBillItem, setVatEnabled, setVatRate,
+        setDiscountEnabled, setDiscountAmount, startSplitting, toggleFriendForItem,
+        toggleAllFriendsForItem, goToPreviousFood, goToNextFood, downloadSummary,
+        finishOperation, selectWholeValue,
+      }} />}
     </main>
   );
 }

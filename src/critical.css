@@ -1841,6 +1841,34 @@ html[data-theme='finance'] .home-dashboard .home-create-button {
   color: #64748b;
 }
 
+.shared-receipt-brand,
+.shared-receipt-header > span,
+.shared-receipt-title > div > span,
+.shared-receipt-section-heading > span,
+.shared-receipt-error > span { color: #075243; }
+
+.shared-receipt-header > span,
+.shared-receipt-section-heading b { background: #efff79; }
+
+.shared-receipt-footer a,
+.shared-receipt-error a {
+  background: #f46e57;
+  box-shadow: 0 3px 0 #075243;
+  transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+.shared-receipt-footer a:hover,
+.shared-receipt-error a:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 #075243;
+  background: #e75f49;
+}
+
+.shared-receipt-page :focus-visible {
+  outline: 3px solid #d0ea64;
+  outline-offset: 3px;
+}
+
 html[data-theme='dark'] .shared-receipt-page {
   color: #f8fafc;
   background:

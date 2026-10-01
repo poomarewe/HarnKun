@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import DoodleField from './DecorativeDoodles';
 import './admin.css';
 
 function formatDate(day) {
@@ -102,6 +103,7 @@ export default function AdminPanel() {
   if (view === 'loading') {
     return (
       <main className="admin-shell admin-centered">
+        <DoodleField variant="admin" className="admin-doodles" />
         <div className="admin-loader" aria-label="Loading admin dashboard" />
       </main>
     );
@@ -110,6 +112,7 @@ export default function AdminPanel() {
   if (view === 'login') {
     return (
       <main className="admin-shell admin-centered">
+        <DoodleField variant="admin" className="admin-doodles" />
         <section className="admin-login-card" aria-labelledby="admin-login-title">
           <a className="admin-brand" href="/" aria-label="Back to Harn Kun">
             <img src="/icon.png" alt="" />
@@ -143,6 +146,7 @@ export default function AdminPanel() {
   const history = dashboard?.history || [];
   return (
     <main className="admin-shell">
+      <DoodleField variant="admin" className="admin-doodles" />
       <header className="admin-header">
         <div>
           <a className="admin-brand" href="/">

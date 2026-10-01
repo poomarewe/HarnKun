@@ -3,12 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 export default function StaggeredMenu({
   children,
   openRequest = 0,
+  closeRequest = 0,
   onClose,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef(null);
   const panelRef = useRef(null);
   const lastOpenRequestRef = useRef(openRequest);
+  const lastCloseRequestRef = useRef(closeRequest);
 
   const closeMenu = () => {
     setIsOpen(false);
@@ -47,8 +49,16 @@ export default function StaggeredMenu({
     setIsOpen(true);
   }, [openRequest]);
 
+  useEffect(() => {
+    if (closeRequest === lastCloseRequestRef.current) return;
+    lastCloseRequestRef.current = closeRequest;
+    setIsOpen(false);
+    onClose?.();
+    toggleRef.current?.focus();
+  }, [closeRequest, onClose]);
+
   return (
-    <div className={`staggered-menu${isOpen ? ' is-open' : ''}`}>
+    <div className={`staggered-menu maggie-menu${isOpen ? ' is-open' : ''}`}>
       <button
         ref={toggleRef}
         className="staggered-menu-toggle"
