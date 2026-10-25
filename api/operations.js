@@ -1,5 +1,5 @@
 function json(data, status = 200, headers = {}) {
-  return Response.json(data, { status, headers });
+  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
 }
 
 export default {
@@ -15,7 +15,7 @@ export default {
       return json({ message: 'A valid JSON body is required.' }, 400);
     }
 
-    const { eventName, friends, billItems, allocations, settlements } = body;
+    const { eventName, friends, billItems } = body || {};
     if (
       typeof eventName !== 'string'
       || !eventName.trim()
@@ -24,6 +24,13 @@ export default {
       || friends.length > 100
       || !Array.isArray(billItems)
       || billItems.length === 0
+      || billItems.length > 1000
+      || eventName.length > 80
+      || friends.some(name => typeof name !== 'string' || !name.trim() || name.length > 60)
+      || new Set(friends.map(name => name.trim().toLocaleLowerCase())).size !== friends.length
+      || billItems.some(item => !item || typeof item.name !== 'string' || !item.name.trim()
+        || !Number.isFinite(item.amount) || item.amount < 0 || item.amount > 1_000_000_000
+        || !Number.isSafeInteger(item.quantity) || item.quantity < 1)
     ) {
       return json({ message: 'A bill name, 2–100 people, and at least one item are required.' }, 400);
     }
@@ -40,15 +47,6 @@ export default {
     }
 
     const total = cleanItems.reduce((sum, item) => sum + item.amount, 0);
-    console.log('New Harn Kun operation:', {
-      eventName: eventName.trim(),
-      friends,
-      billItems: cleanItems,
-      allocations,
-      settlements,
-      total,
-    });
-
     return json({ message: 'Operation received.', total }, 201);
   },
 };

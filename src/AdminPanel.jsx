@@ -92,12 +92,15 @@ export default function AdminPanel() {
   };
 
   const handleLogout = async () => {
-    await fetch('/api/admin-logout', {
-      method: 'POST',
-      credentials: 'same-origin',
-    }).catch(() => {});
-    setDashboard(null);
-    setView('login');
+    setSubmitting(true);
+    setError('');
+    try {
+      await readJson(await fetch('/api/admin-logout', { method: 'POST', credentials: 'same-origin' }));
+      setDashboard(null);
+      setView('login');
+    } catch {
+      setError('Could not log out. Your session may still be active. Please try again.');
+    } finally { setSubmitting(false); }
   };
 
   if (view === 'loading') {
@@ -160,8 +163,8 @@ export default function AdminPanel() {
           <button className="admin-secondary-button" type="button" onClick={() => loadDashboard()}>
             Refresh
           </button>
-          <button className="admin-secondary-button" type="button" onClick={handleLogout}>
-            Log out
+          <button className="admin-secondary-button" type="button" disabled={submitting} onClick={handleLogout}>
+            {submitting ? 'Logging out…' : 'Log out'}
           </button>
         </div>
       </header>

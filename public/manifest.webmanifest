@@ -1,7 +1,7 @@
 {
   "name": "Harn Kun",
   "short_name": "Harn Kun",
-  "description": "Split any bill and share every expense clearly.",
+  "description": "Split bills with friends for free, scan receipts, assign items, and share the payment breakdown.",
   "id": "/",
   "start_url": "/",
   "scope": "/",

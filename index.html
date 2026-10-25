@@ -2,26 +2,30 @@
 <html lang="en" data-theme="finance" style="color-scheme: light;">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
-    <meta name="description" content="Harn Kun makes splitting any shared bill or expense quick, clear, and effortless." />
-    <meta name="robots" content="index, follow" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="description" content="Split bills with friends for free. Add items manually or scan a receipt, assign each cost, and share a clear payment breakdown — no account needed." />
     <meta name="theme-color" content="#ebe8f3" />
-    <link rel="canonical" href="https://Harn.fun/" />
+    <link rel="canonical" href="https://harn.fun/" />
+    <link rel="alternate" hreflang="en" href="https://harn.fun/" />
+    <link rel="alternate" hreflang="th-TH" href="https://harn.fun/th/" />
+    <link rel="alternate" hreflang="x-default" href="https://harn.fun/" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Harn Kun" />
-    <meta property="og:title" content="Harn Kun — Split Bills Easily" />
-    <meta property="og:description" content="Split shared bills and expenses quickly, clearly, and effortlessly." />
-    <meta property="og:url" content="https://Harn.fun/" />
-    <meta property="og:image" content="https://Harn.fun/icon.png" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="th_TH" />
+    <meta property="og:title" content="Harn Kun | Free Bill Splitter for Friends" />
+    <meta property="og:description" content="Split bills with friends for free. Add items manually or scan a receipt, assign each cost, and share a clear payment breakdown — no account needed." />
+    <meta property="og:url" content="https://harn.fun/" />
+    <meta property="og:image" content="https://harn.fun/icon.png" />
     <meta property="og:image:width" content="512" />
     <meta property="og:image:height" content="512" />
     <meta property="og:image:alt" content="Harn Kun app icon" />
 
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Harn Kun — Split Bills Easily" />
-    <meta name="twitter:description" content="Split shared bills and expenses quickly, clearly, and effortlessly." />
-    <meta name="twitter:image" content="https://Harn.fun/icon.png" />
+    <meta name="twitter:title" content="Harn Kun | Free Bill Splitter for Friends" />
+    <meta name="twitter:description" content="Split bills with friends for free. Add items manually or scan a receipt, assign each cost, and share a clear payment breakdown — no account needed." />
+    <meta name="twitter:image" content="https://harn.fun/icon.png" />
     <meta name="twitter:image:alt" content="Harn Kun app icon" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -33,17 +37,38 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "Harn Kun",
-        "url": "https://Harn.fun/",
-        "description": "Harn Kun makes splitting any shared bill or expense quick, clear, and effortless.",
-        "applicationCategory": "FinanceApplication",
-        "operatingSystem": "Any",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "THB"
-        }
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://harn.fun/#website",
+            "url": "https://harn.fun/",
+            "name": "Harn Kun",
+            "alternateName": "Harn.fun",
+            "inLanguage": "en"
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://harn.fun/#app",
+            "name": "Harn Kun",
+            "url": "https://harn.fun/",
+            "description": "Split bills with friends for free. Add items manually or scan a receipt, assign each cost, and share a clear payment breakdown — no account needed.",
+            "applicationCategory": "FinanceApplication",
+            "operatingSystem": "Any",
+            "isPartOf": { "@id": "https://harn.fun/#website" },
+            "featureList": [
+              "Enter bill items manually or scan a receipt",
+              "Assign shared items to friends",
+              "Review a clear payment breakdown",
+              "Save bill history in the browser",
+              "Share read-only bill details"
+            ],
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "THB"
+            }
+          }
+        ]
       }
     </script>
     <script>
@@ -58,7 +83,7 @@
         } catch {}
       })();
     </script>
-    <title>Harn Kun</title>
+    <title>Harn Kun | Free Bill Splitter for Friends</title>
   </head>
   <body>
     <div id="root"></div>

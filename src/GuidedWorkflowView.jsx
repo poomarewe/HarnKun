@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import DoodleField, { Doodle } from './DecorativeDoodles';
+import { itemShare } from './money.js';
 
 const stageNames = ['People', 'Bill', 'Sharing', 'Summary'];
 
@@ -10,7 +11,7 @@ export default function GuidedWorkflowView({ flow }) {
     ocrProgress, cooldownRemaining, cameraFlow, pendingCameraUrl, cropAspect,
     cropBaseSize, cropTransform, isCropping, editingBillIndex, vatEnabled, vatRate,
     discountEnabled, discountAmount, subtotal, vatAmount, appliedDiscount, total,
-    allocations, isSaving, settlements, peopleNameConfirmed, manualComposerOpen,
+    allocations, isSaving, settlements, historySaved, finishSplitting, peopleNameConfirmed, manualComposerOpen,
     manualItemName, manualItemPrice, manualQuantity, showManualQuantity, showBillExtras,
     inputRef, manualNameRef, cameraInputRef, uploadInputRef, cropWorkspaceRef,
     cropFrameRef, cropImageRef, billListRef, billEditorRef,
@@ -31,6 +32,22 @@ export default function GuidedWorkflowView({ flow }) {
   const currentItem = billItems[splitIndex];
   const hasItems = billItems.some((item) => item.name.trim());
   const hasPendingItem = manualComposerOpen && (manualItemName.trim() || manualItemPrice !== '');
+  const priceInputRef = useRef(null);
+  const quantityInputRef = useRef(null);
+  const showMobileItemAction = step === 'bill' && !cameraFlow && ocrStatus !== 'scanning'
+    && editingBillIndex === null && manualComposerOpen && !showBillExtras && (hasPendingItem || !hasItems);
+  const dismissKeyboard = () => document.activeElement?.blur();
+  const finishEditing = () => { dismissKeyboard(); setEditingBillIndex(null); };
+  const confirmName = (event) => { event?.preventDefault(); if (!eventName.trim()) return; dismissKeyboard(); setPeopleNameConfirmed(true); };
+  const focusPrice = (event) => {
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    priceInputRef.current?.focus();
+  };
+  const toggleQuantity = () => {
+    setShowManualQuantity((open) => !open);
+    if (!showManualQuantity) window.requestAnimationFrame(() => quantityInputRef.current?.focus());
+  };
   const titles = {
     friends: peopleNameConfirmed ? 'Who is splitting?' : 'Give this bill a name.',
     bill: hasItems ? 'Your bill, made clear.' : 'How should we add the bill?',
@@ -41,7 +58,7 @@ export default function GuidedWorkflowView({ flow }) {
     friends: peopleNameConfirmed ? 'Add everyone who joined. You can remove a name before continuing.' : 'A short name makes this bill easy to find later.',
     bill: hasItems ? 'Review the items, then move on when everything looks right.' : 'Take a photo, upload one, or enter items yourself.',
     split: 'Tap everyone who shared this item. We will divide its price evenly.',
-    result: 'Here is what each person owes. This bill is saved in Recent bills.',
+    result: historySaved ? 'Here is what each person owes. This bill is saved in Recent bills.' : 'Here is what each person owes. This bill has not been saved on this device.',
   };
 
   return (
@@ -49,7 +66,7 @@ export default function GuidedWorkflowView({ flow }) {
       <BitsSurface
         as="section"
         key={`${step}-${step === 'split' ? splitIndex : ''}`}
-        className={`operation-panel guided-flow direction-${workflowDirection} step-${step}`}
+        className={`operation-panel guided-flow direction-${workflowDirection} step-${step}${editingBillIndex !== null ? ' is-editing-item' : ''}${showMobileItemAction ? ' has-mobile-item-action' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={`${stageNames[stageIndex]} step`}
@@ -57,7 +74,9 @@ export default function GuidedWorkflowView({ flow }) {
       >
         <header className="guided-header">
           <div className="guided-brand"><span aria-hidden="true">✳</span> Harn Kun</div>
+          <span className="guided-header-step">{stageNames[stageIndex]} · {stageIndex + 1}/4</span>
           <div className="guided-header-actions">
+            <BitsButton type="button" className="guided-keyboard-dismiss" onClick={dismissKeyboard} aria-label="Hide keyboard" title="Hide keyboard"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="11" rx="2" /><path d="M6 6h1m3 0h1m3 0h1m3 0h.1M6 10h12m-10 8 4 3 4-3" /></svg></BitsButton>
             <BitsButton type="button" className="guided-back" onClick={guidedGoBack} disabled={isSaving || ocrStatus === 'scanning'} aria-label="Back">←</BitsButton>
             <BitsButton type="button" className="guided-close" onClick={closePanel} aria-label="Close">×</BitsButton>
           </div>
@@ -91,12 +110,12 @@ export default function GuidedWorkflowView({ flow }) {
           )}
 
           {step === 'friends' && !peopleNameConfirmed && (
-            <div className="guided-card">
+            <form id="guided-bill-name" className="guided-card" onSubmit={confirmName}>
               <h3 className="guided-prompt">What was the occasion?</h3>
               <label className="guided-field" htmlFor="bill-event-name">Bill name
-                <input id="bill-event-name" type="text" value={eventName} onChange={(event) => setEventName(event.target.value)} maxLength={80} placeholder="e.g. Friday dinner" autoComplete="off" autoFocus />
+                <input id="bill-event-name" type="text" value={eventName} onChange={(event) => setEventName(event.target.value)} maxLength={80} placeholder="e.g. Friday dinner" autoComplete="off" enterKeyHint="next" required autoFocus />
               </label>
-            </div>
+            </form>
           )}
 
           {step === 'friends' && peopleNameConfirmed && (
@@ -147,10 +166,10 @@ export default function GuidedWorkflowView({ flow }) {
                       <div className="guided-list" ref={billListRef}>
                         {billItems.map((item, index) => editingBillIndex === index ? (
                           <div className="guided-list-row guided-item-editor" ref={billEditorRef} key={`bill-item-${index}`}>
-                            <label className="guided-field">Item name<input autoFocus value={item.name} onChange={(event) => updateBillItem(index, 'name', event.target.value)} placeholder="Item or expense" /></label>
-                            <label className="guided-field">Line total<input type="number" min="0" step="0.01" inputMode="decimal" value={item.amount} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'amount', event.target.value)} /></label>
-                            <label className="guided-field">Quantity<input type="number" min="1" inputMode="numeric" value={item.quantity} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'quantity', event.target.value)} /></label>
-                            <div className="guided-inline-actions"><BitsButton type="button" className="guided-secondary" onClick={() => removeBillItem(index)}>Delete</BitsButton><BitsButton type="button" className="guided-action" onClick={() => setEditingBillIndex(null)}>Done</BitsButton></div>
+                            <label className="guided-field">Item name<input autoFocus enterKeyHint="next" value={item.name} onChange={(event) => updateBillItem(index, 'name', event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.closest('.guided-item-editor').querySelector('input[type="number"]')?.focus(); } }} placeholder="Item or expense" /></label>
+                            <label className="guided-field">Line total<input type="number" min="0" step="0.01" inputMode="decimal" enterKeyHint="next" value={item.amount} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'amount', event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.closest('.guided-item-editor').querySelectorAll('input[type="number"]')[1]?.focus(); } }} /></label>
+                            <label className="guided-field">Quantity<input type="number" min="1" inputMode="numeric" enterKeyHint="done" value={item.quantity} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => updateBillItem(index, 'quantity', event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); finishEditing(); } }} /></label>
+                            <div className="guided-inline-actions"><BitsButton type="button" className="guided-secondary" onClick={() => removeBillItem(index)}>Delete</BitsButton><BitsButton type="button" className="guided-action" onClick={finishEditing}>Done</BitsButton></div>
                           </div>
                         ) : (
                           <div className="guided-list-row" key={`bill-item-${index}`}>
@@ -199,17 +218,17 @@ export default function GuidedWorkflowView({ flow }) {
                           manualComposerOpen ? (
                             <div className="guided-bill-entry">
                               <h3 className="guided-prompt">{hasItems ? 'Add another item.' : 'What is the first item?'}</h3>
-                              <form className="guided-composer guided-item-composer" onSubmit={addManualItemFromComposer}>
-                                <label className="guided-field">Item name<input ref={manualNameRef} type="text" value={manualItemName} onChange={(event) => setManualItemName(event.target.value)} placeholder="e.g. Pizza" maxLength={100} autoComplete="off" /></label>
-                                <label className="guided-field">Total price<input type="number" min="0" step="0.01" inputMode="decimal" value={manualItemPrice} onChange={(event) => setManualItemPrice(event.target.value)} placeholder="0.00" /></label>
+                              <form id="guided-item-form" className="guided-composer guided-item-composer" onSubmit={addManualItemFromComposer}>
+                                <label className="guided-field">Item name<input ref={manualNameRef} type="text" value={manualItemName} onChange={(event) => setManualItemName(event.target.value)} onKeyDown={focusPrice} enterKeyHint="next" placeholder="e.g. Pizza" maxLength={100} autoComplete="off" /></label>
+                                <label className="guided-field">Total price<input ref={priceInputRef} type="number" min="0" step="0.01" inputMode="decimal" enterKeyHint="done" value={manualItemPrice} onChange={(event) => setManualItemPrice(event.target.value)} placeholder="0.00" /></label>
                                 <BitsButton type="submit" className="guided-action" disabled={!manualItemName.trim() || manualItemPrice === ''}>Add item</BitsButton>
                               </form>
                               <div className="guided-entry-extras">
                                 <div className="guided-entry-extra-actions">
-                                  <BitsButton type="button" className="guided-reveal" aria-expanded={showManualQuantity} onClick={() => setShowManualQuantity((open) => !open)}>{showManualQuantity ? 'Hide quantity' : 'Add quantity'}</BitsButton>
-                                  {!billItems.length && <BitsButton type="button" className="guided-reveal" onClick={() => setManualComposerOpen(false)}>Use a photo instead</BitsButton>}
+                                  <BitsButton type="button" className="guided-reveal guided-inline-quantity-toggle" aria-expanded={showManualQuantity} onClick={toggleQuantity}>{showManualQuantity ? 'Hide quantity' : 'Add quantity'}</BitsButton>
+                                  {!billItems.length && <BitsButton type="button" className="guided-reveal guided-photo-alternative" onClick={() => setManualComposerOpen(false)}>Use a photo instead</BitsButton>}
                                 </div>
-                                {showManualQuantity && <label className="guided-field guided-quantity-field">Quantity<input type="number" min="1" inputMode="numeric" value={manualQuantity} onChange={(event) => setManualQuantity(event.target.value)} /></label>}
+                                {showManualQuantity && <label className="guided-field guided-quantity-field">Quantity<input ref={quantityInputRef} form="guided-item-form" type="number" min="1" step="1" inputMode="numeric" enterKeyHint="done" value={manualQuantity} onChange={(event) => setManualQuantity(event.target.value)} /></label>}
                               </div>
                             </div>
                           ) : hasItems && (
@@ -225,9 +244,9 @@ export default function GuidedWorkflowView({ flow }) {
                           <p className="guided-note">Add tax or a discount if the bill needs it.</p>
                           <div className="guided-adjustments">
                             <label className="guided-check"><input type="checkbox" checked={vatEnabled} onChange={(event) => setVatEnabled(event.target.checked)} />Add VAT</label>
-                            {vatEnabled && <label className="guided-field">VAT percentage<input type="number" min="0" max="100" step="0.01" inputMode="decimal" value={vatRate} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => setVatRate(event.target.value)} /></label>}
+                            {vatEnabled && <label className="guided-field">VAT percentage<input type="number" min="0" max="100" step="0.01" inputMode="decimal" enterKeyHint="done" value={vatRate} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => setVatRate(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); dismissKeyboard(); } }} /></label>}
                             <label className="guided-check"><input type="checkbox" checked={discountEnabled} onChange={(event) => setDiscountEnabled(event.target.checked)} />Add discount</label>
-                            {discountEnabled && <label className="guided-field">Discount in baht<input type="number" min="0" step="0.01" inputMode="decimal" value={discountAmount} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => setDiscountAmount(event.target.value)} /></label>}
+                            {discountEnabled && <label className="guided-field">Discount in baht<input type="number" min="0" step="0.01" inputMode="decimal" enterKeyHint="done" value={discountAmount} onFocus={selectWholeValue} onClick={selectWholeValue} onChange={(event) => setDiscountAmount(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); dismissKeyboard(); } }} /></label>}
                           </div>
                           {hasPendingItem && <p className="guided-note">Your current item is still waiting in Add item.</p>}
                           </div>
@@ -254,10 +273,10 @@ export default function GuidedWorkflowView({ flow }) {
                 <div className="guided-split-options">
                   {friends.map((friend) => {
                     const selected = selectedFriends.includes(friend);
-                    return <BitsButton type="button" key={friend} className={`guided-split-option${selected ? ' is-selected' : ''}`} aria-pressed={selected} onClick={() => toggleFriendForItem(friend)}><span aria-hidden="true">{selected ? '✓' : '+'}</span><strong>{friend}</strong>{selected && <small>฿{((Number(currentItem.amount) || 0) / selectedFriends.length).toFixed(2)}</small>}</BitsButton>;
+                    return <BitsButton type="button" key={friend} className={`guided-split-option${selected ? ' is-selected' : ''}`} aria-pressed={selected} onClick={() => toggleFriendForItem(friend)}><span aria-hidden="true">{selected ? '✓' : '+'}</span><strong>{friend}</strong>{selected && <small>฿{itemShare(currentItem.amount, selectedFriends.length, selectedFriends.indexOf(friend)).toFixed(2)}</small>}</BitsButton>;
                   })}
                 </div>
-                <p className="guided-note">{selectedFriends.length ? `${selectedFriends.length} selected · ฿${((Number(currentItem.amount) || 0) / selectedFriends.length).toFixed(2)} each` : 'Select at least one person to continue.'}</p>
+                <p className="guided-note">{selectedFriends.length ? `${selectedFriends.length} selected · Any extra satang goes to the first selected people.` : 'Select at least one person to continue.'}</p>
               </div></div>
             </div>
           )}
@@ -269,18 +288,23 @@ export default function GuidedWorkflowView({ flow }) {
             </div>
           )}
 
-          {error && !cameraFlow && <p className="guided-error" role="alert">{error}</p>}
+          {error && !cameraFlow && <p className="guided-error guided-desktop-error" role="alert">{error}</p>}
         </div>
 
-        <footer className="guided-footer"><div>
+        <footer className={`guided-footer${showMobileItemAction && !hasItems ? ' has-mobile-only-action' : ''}`}>
+          {error && !cameraFlow && <p className="guided-error guided-mobile-error" role="alert">{error}</p>}
+          {step === 'bill' && hasItems && ocrStatus !== 'scanning' && !cameraFlow && <div className="guided-footer-total"><span>{billItems.length} {billItems.length === 1 ? 'item' : 'items'}</span><strong>Total ฿{total.toFixed(2)}</strong></div>}
+          <div>
           {step === 'friends' && (!peopleNameConfirmed ? (
-            <BitsButton type="button" className="guided-action" disabled={!eventName.trim()} onClick={() => setPeopleNameConfirmed(true)}>Next: add people <span aria-hidden="true">→</span></BitsButton>
+            <BitsButton type="submit" form="guided-bill-name" className="guided-action" disabled={!eventName.trim()}>Next: add people <span aria-hidden="true">→</span></BitsButton>
           ) : (
             <BitsButton type="button" className="guided-action" disabled={friends.length < 2 || !eventName.trim()} onClick={continueToBill}>{friends.length < 2 ? `Add ${2 - friends.length} more` : 'Continue to bill'} <span aria-hidden="true">→</span></BitsButton>
           ))}
-          {step === 'bill' && billItems.length > 0 && ocrStatus !== 'scanning' && <BitsButton type="button" className="guided-action" disabled={!hasItems || editingBillIndex !== null || hasPendingItem} onClick={startSplitting}>{hasPendingItem ? 'Add your current item first' : 'Continue to sharing'} <span aria-hidden="true">→</span></BitsButton>}
+          {showMobileItemAction && <><BitsButton type="button" className="guided-secondary guided-mobile-quantity-toggle" aria-expanded={showManualQuantity} onClick={toggleQuantity}>{showManualQuantity ? 'Hide quantity' : 'Add quantity'}</BitsButton><BitsButton type="submit" form="guided-item-form" className="guided-action guided-mobile-item-submit" disabled={!manualItemName.trim() || manualItemPrice === ''}>Add item <span aria-hidden="true">＋</span></BitsButton></>}
+          {step === 'bill' && editingBillIndex !== null && <div className="guided-mobile-edit-actions"><BitsButton type="button" className="guided-secondary" onClick={() => { dismissKeyboard(); removeBillItem(editingBillIndex); }}>Delete item</BitsButton><BitsButton type="button" className="guided-action" onClick={finishEditing}>Done</BitsButton></div>}
+          {step === 'bill' && billItems.length > 0 && ocrStatus !== 'scanning' && <BitsButton type="button" className="guided-action guided-continue-sharing" disabled={!hasItems || editingBillIndex !== null || hasPendingItem} onClick={startSplitting}>{hasPendingItem ? 'Add your current item first' : 'Continue to sharing'} <span aria-hidden="true">→</span></BitsButton>}
           {step === 'split' && <><BitsButton type="button" className="guided-secondary" disabled={splitIndex === 0 || isSaving} onClick={goToPreviousFood}>Previous item</BitsButton><BitsButton type="button" className="guided-action" disabled={!selectedFriends.length || isSaving} onClick={goToNextFood}>{isSaving ? 'Calculating…' : splitIndex === billItems.length - 1 ? 'See the split' : 'Next item'} <span aria-hidden="true">→</span></BitsButton></>}
-          {step === 'result' && <><BitsButton type="button" className="guided-secondary" onClick={() => downloadSummary()}>Download picture</BitsButton><BitsButton type="button" className="guided-action" onClick={finishOperation}>Done <span aria-hidden="true">✓</span></BitsButton></>}
+          {step === 'result' && <><BitsButton type="button" className="guided-secondary" onClick={() => downloadSummary()}>Download picture</BitsButton>{!historySaved && <BitsButton type="button" className="guided-secondary" disabled={isSaving} onClick={finishSplitting}>Retry saving</BitsButton>}<BitsButton type="button" className="guided-action" onClick={finishOperation}>Done <span aria-hidden="true">✓</span></BitsButton></>}
         </div></footer>
 
         {step === 'bill' && cameraFlow && (
@@ -290,7 +314,7 @@ export default function GuidedWorkflowView({ flow }) {
             <div ref={cropWorkspaceRef} className="camera-crop-workspace" onPointerDown={beginCropDrag} onPointerMove={moveCropDrag} onPointerUp={endCropDrag} onPointerCancel={endCropDrag} onWheel={zoomCropWithWheel}>
               <BitsButton type="button" className="crop-aspect-toggle" aria-label={`Switch crop frame to ${cropAspect === '16:9' ? '9 by 16 portrait' : '16 by 9 landscape'}`} onPointerDown={(event) => event.stopPropagation()} onClick={toggleCropAspect}><span>{cropAspect}</span></BitsButton>
               {!cropBaseSize.width && <div className="camera-photo-skeleton" role="status" aria-label="Preparing photo"><span /></div>}
-              <img ref={cropImageRef} src={pendingCameraUrl} alt="Bill to crop" draggable="false" onLoad={() => window.requestAnimationFrame(initializeCropEditor)} style={{ width: `${cropBaseSize.width}px`, height: `${cropBaseSize.height}px`, transform: `translate(-50%, -50%) translate3d(${cropTransform.x}px, ${cropTransform.y}px, 0) rotate(${cropTransform.rotation}deg) scale(${cropTransform.zoom})` }} />
+              <img ref={cropImageRef} src={pendingCameraUrl} alt="Bill to crop" draggable="false" onError={() => { closeCameraFlow(); flow.setError('This image could not be opened. Choose a supported photo or type the items instead.'); }} onLoad={() => window.requestAnimationFrame(initializeCropEditor)} style={{ width: `${cropBaseSize.width}px`, height: `${cropBaseSize.height}px`, transform: `translate(-50%, -50%) translate3d(${cropTransform.x}px, ${cropTransform.y}px, 0) rotate(${cropTransform.rotation}deg) scale(${cropTransform.zoom})` }} />
               <div ref={cropFrameRef} className={`camera-crop-frame${cropAspect === '9:16' ? ' is-portrait' : ''}`} aria-hidden="true" />
             </div>
             <div className="camera-confirm-actions"><BitsButton type="button" disabled={isCropping} onClick={() => (cameraFlow === 'upload' ? uploadInputRef : cameraInputRef).current?.click()}>{cameraFlow === 'upload' ? 'Choose again' : 'Retake'}</BitsButton><BitsButton type="button" className="camera-confirm-button" disabled={!cropBaseSize.width || isCropping} onClick={confirmCameraBill}>{isCropping ? 'Preparing…' : 'Confirm photo'}</BitsButton></div>

@@ -35,11 +35,11 @@ export default function StaggeredMenu({
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    const focusTimer = window.setTimeout(() => panelRef.current?.focus(), 360);
+    const focusFrame = window.requestAnimationFrame(() => panelRef.current?.focus({ preventScroll: true }));
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      window.clearTimeout(focusTimer);
+      window.cancelAnimationFrame(focusFrame);
     };
   }, [isOpen]);
 
@@ -86,6 +86,7 @@ export default function StaggeredMenu({
         id="history-staggered-menu"
         className="staggered-menu-panel"
         aria-hidden={!isOpen}
+        inert={!isOpen}
         aria-label="History"
         tabIndex={-1}
       >

@@ -25,7 +25,7 @@ export default {
       const message = error instanceof AnalyticsSetupError
         ? error.message
         : 'Analytics is temporarily unavailable.';
-      if (!(error instanceof AnalyticsSetupError)) console.error('Analytics heartbeat failed:', error);
+      if (!(error instanceof AnalyticsSetupError)) console.error('Analytics heartbeat failed.');
       return json({ message }, 503);
     }
   },

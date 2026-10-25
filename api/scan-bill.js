@@ -7,7 +7,14 @@ const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 const TYPHOON_OCR_PROMPT = `Read this Thai or English receipt. Return only purchased item rows as one clean HTML table with exactly these columns: item, quantity, total price. Keep item names exactly as printed. Exclude the shop header, address, dates, invoice numbers, subtotal, VAT, discounts, payment, cash, change, QR codes, and explanations.`;
 
 function json(data, status = 200, headers = {}) {
-  return Response.json(data, { status, headers });
+  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
+}
+
+function cooldownResponse(clientId) {
+  const remainingMs = SCAN_COOLDOWN_MS - (Date.now() - (scanCooldowns.get(clientId) || 0));
+  if (remainingMs <= 0) return null;
+  const retryAfter = Math.ceil(remainingMs / 1000);
+  return json({ message: `Please wait ${retryAfter} seconds before scanning another bill.`, retryAfter }, 429, { 'Retry-After': String(retryAfter) });
 }
 
 function getClientId(request) {
@@ -23,16 +30,8 @@ export default {
     }
 
     const clientId = getClientId(request);
-    const previousScan = scanCooldowns.get(clientId) || 0;
-    const remainingMs = SCAN_COOLDOWN_MS - (Date.now() - previousScan);
-    if (remainingMs > 0) {
-      const retryAfter = Math.ceil(remainingMs / 1000);
-      return json(
-        { message: `Please wait ${retryAfter} seconds before scanning another bill.`, retryAfter },
-        429,
-        { 'Retry-After': String(retryAfter) },
-      );
-    }
+    const cooldown = cooldownResponse(clientId);
+    if (cooldown) return cooldown;
 
     const apiKey = process.env.TYPHOON_OCR_API_KEY;
     if (!apiKey) {
@@ -40,6 +39,9 @@ export default {
     }
 
     let bill;
+    if (Number(request.headers.get('content-length')) > MAX_UPLOAD_BYTES + 64 * 1024) {
+      return json({ message: 'The upload is too large. Use a photo smaller than 4 MB.' }, 413);
+    }
     try {
       const formData = await request.formData();
       bill = formData.get('bill');
@@ -57,11 +59,24 @@ export default {
       return json({ message: 'The photo is too large. Please use an image smaller than 4 MB.' }, 413);
     }
 
+    // Form parsing yields; recheck before reserving to stop concurrent same-IP scans.
+    const pendingCooldown = cooldownResponse(clientId);
+    if (pendingCooldown) return pendingCooldown;
+    for (const [id, started] of scanCooldowns) {
+      if (Date.now() - started >= SCAN_COOLDOWN_MS) scanCooldowns.delete(id);
+    }
+    if (scanCooldowns.size >= 10_000) return json({ message: 'The scan service is busy. Please try again shortly.' }, 429, { 'Retry-After': '30' });
     scanCooldowns.set(clientId, Date.now());
 
+    let providerStarted = false;
     try {
       const inputBuffer = Buffer.from(await bill.arrayBuffer());
-      const optimizedImage = await sharp(inputBuffer)
+      const image = sharp(inputBuffer, { limitInputPixels: 40_000_000 });
+      const metadata = await image.metadata();
+      if (!['jpeg', 'png', 'webp', 'gif', 'tiff', 'heif'].includes(metadata.format)) {
+        return json({ message: 'Use a JPEG, PNG, WebP, GIF, TIFF or supported HEIF receipt photo.' }, 415);
+      }
+      const optimizedImage = await image
         .rotate()
         .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
         .flatten({ background: '#ffffff' })
@@ -70,6 +85,7 @@ export default {
         .toBuffer();
       const imageUrl = `data:image/jpeg;base64,${optimizedImage.toString('base64')}`;
 
+      providerStarted = true;
       const typhoonResponse = await fetch('https://api.opentyphoon.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -93,28 +109,33 @@ export default {
         signal: AbortSignal.timeout(55_000),
       });
 
+      if (!typhoonResponse.ok) {
+        if (typhoonResponse.status === 429) {
+          const retryAfter = Math.min(300, Math.max(30, Number(typhoonResponse.headers.get('retry-after')) || 30));
+          return json({ message: 'The scan service is busy. Please wait before trying again, or type the items.', retryAfter }, 429, { 'Retry-After': String(retryAfter) });
+        }
+        return json({ message: 'The scan service is temporarily unavailable. Please try again or type the items.' }, 503);
+      }
       const responseText = await typhoonResponse.text();
       let result;
       try {
         result = JSON.parse(responseText);
       } catch {
-        throw new Error(`Typhoon returned an invalid response (HTTP ${typhoonResponse.status}).`);
+        return json({ message: 'The scan service returned an unreadable response. Please try again or type the items.' }, 502);
       }
 
-      if (!typhoonResponse.ok) {
-        throw new Error(result.error?.message || result.message || `Typhoon request failed with HTTP ${typhoonResponse.status}.`);
-      }
-
-      const extractedText = result.choices?.[0]?.message?.content;
+      const extractedText = result?.choices?.[0]?.message?.content;
       if (typeof extractedText !== 'string' || !extractedText.trim()) {
-        throw new Error('Typhoon did not return any receipt text.');
+        return json({ message: 'No receipt text was found. Try a clearer photo or type the items.' }, 422);
       }
 
       return json({ text: extractedText, tsv: '', engine: 'typhoon-ocr' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || 'Unknown OCR error');
-      console.error('Typhoon OCR failed:', message);
-      return json({ message: `Could not read this image: ${message}` }, 422);
+      if (!providerStarted) return json({ message: 'This image could not be opened. Choose a supported photo or type the items.' }, 415);
+      if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+        return json({ message: 'The scan took too long. Please try again or type the items.' }, 504);
+      }
+      return json({ message: 'Could not reach the scan service. Check your connection or type the items.' }, 503);
     }
   },
 };

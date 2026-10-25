@@ -11,10 +11,16 @@ import GuidedWorkflowView from './GuidedWorkflowView';
 import DoodleField, { Doodle } from './DecorativeDoodles';
 import AdminPanel from './AdminPanel';
 import useVisitorAnalytics from './useVisitorAnalytics';
+import useDialogKeyboard from './useDialogKeyboard';
+import { getBillTotals, isValidMoney, itemShare, MAX_BAHT, toSatang } from './money.js';
+import { saveHistoryRecord, readHistoryRecords, clearHistoryRecords, deleteHistoryRecord, subscribeHistoryChanges } from './history-store.js';
 import './critical.css';
 import './clay-home.css';
 import './maggie-home.css';
 import './doodles.css';
+import appStylesUrl from './styles.css?url';
+import clayStylesUrl from './clay.css?url';
+import workflowStylesUrl from './maggie-workflow.css?url';
 
 const APP_VERSION = __APP_VERSION__;
 const APP_VERSION_TIME = __APP_VERSION_TIME__;
@@ -23,11 +29,31 @@ let appStylesPromise;
 
 const loadAppStyles = () => {
   if (!appStylesPromise) {
-    appStylesPromise = import('./styles.css')
-      .then(() => import('./clay.css'))
-      .then(() => import('./maggie-workflow.css'));
+    // Insert in cascade order, but download together. Own the links so a failed
+    // preload can be removed and retried instead of staying in the import cache.
+    const links = [];
+    appStylesPromise = Promise.all([appStylesUrl, clayStylesUrl, workflowStylesUrl].map((href) => (
+      new Promise((resolve, reject) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        link.onload = resolve;
+        link.onerror = () => reject(new Error('Could not load bill styles.'));
+        links.push(link);
+        document.head.appendChild(link);
+      })
+    ))).catch((error) => {
+      links.forEach((link) => link.remove());
+      appStylesPromise = undefined;
+      throw error;
+    });
   }
   return appStylesPromise;
+};
+
+const warmAppStyles = () => {
+  // Background loading is optional; an explicit tap will retry after a failure.
+  void loadAppStyles().catch(() => {});
 };
 
 const SHARE_HISTORY_URL = 'https://harn.fun/history';
@@ -106,6 +132,7 @@ async function encodeSharedReceipt(record) {
 }
 
 async function decodeSharedReceipt(value) {
+  if (typeof value !== 'string' || value.length > 128_000) throw new Error('Shared receipt is too large.');
   const isCompressed = value.startsWith('z');
   const encodedValue = isCompressed ? value.slice(1) : value;
   const padded = encodedValue.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat((4 - encodedValue.length % 4) % 4);
@@ -113,11 +140,28 @@ async function decodeSharedReceipt(value) {
   let bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   if (isCompressed) {
     const { gunzipSync } = await import('fflate');
-    bytes = gunzipSync(bytes);
+    if (bytes.length < 18) throw new Error('Invalid compressed receipt.');
+    const expectedBytes = new DataView(bytes.buffer, bytes.byteOffset + bytes.length - 4, 4).getUint32(0, true);
+    if (expectedBytes > 256_000) throw new Error('Shared receipt is too large.');
+    bytes = gunzipSync(bytes, { out: new Uint8Array(expectedBytes) });
   }
+  if (bytes.length > 256_000) throw new Error('Shared receipt is too large.');
   const compact = JSON.parse(new TextDecoder().decode(bytes));
   if (compact.v !== 1 || typeof compact.n !== 'string' || !Array.isArray(compact.f) || !Array.isArray(compact.i)) {
     throw new Error('Unsupported shared receipt.');
+  }
+  if (compact.n.length > 80 || compact.f.length < 2 || compact.f.length > 100
+    || compact.f.some(name => typeof name !== 'string' || !name.trim() || name.length > 60)
+    || new Set(compact.f.map(name => name.toLocaleLowerCase())).size !== compact.f.length
+    || compact.i.length === 0 || compact.i.length > 1000
+    || compact.i.some(row => !Array.isArray(row) || typeof row[0] !== 'string' || !row[0].trim()
+      || !Number.isSafeInteger(row[1]) || row[1] < 1 || !isValidMoney(row[2])
+      || !Array.isArray(row[3]) || row[3].some(index => !Number.isInteger(index) || index < 0 || index >= compact.f.length)
+      || new Set(row[3]).size !== row[3].length)
+    || !Array.isArray(compact.s) || compact.s.length !== compact.f.length || compact.s.some(value => !isValidMoney(value))
+    || (compact.a !== undefined && (!Array.isArray(compact.a) || compact.a.length !== 2 || compact.a.some(value => !isValidMoney(value)) || compact.a[0] > 100))
+    || (compact.d !== undefined && (!Number.isFinite(compact.d) || Math.abs(compact.d) > 8.64e15))) {
+    throw new Error('Invalid shared receipt details.');
   }
   const friends = compact.f.map(String).slice(0, 100);
   const billItems = compact.i.map(([name, quantity, amount]) => ({
@@ -129,10 +173,9 @@ async function decodeSharedReceipt(value) {
     ? item[3].map((index) => friends[index]).filter(Boolean)
     : []);
   const settlements = friends.map((name, index) => ({ name, amount: Math.max(0, Number(compact.s?.[index]) || 0) }));
-  const subtotal = billItems.reduce((sum, item) => sum + item.amount, 0);
   const vatRate = Math.max(0, Number(compact.a?.[0]) || 0);
   const discountAmount = Math.max(0, Number(compact.a?.[1]) || 0);
-  const vatAmount = subtotal * vatRate / 100;
+  const { subtotal, vatAmount, total } = getBillTotals(billItems, vatRate > 0, vatRate, discountAmount > 0, discountAmount);
   return {
     id: `shared-${value.slice(0, 18)}`,
     eventName: compact.n,
@@ -146,7 +189,7 @@ async function decodeSharedReceipt(value) {
     vatAmount,
     discountEnabled: discountAmount > 0,
     discountAmount,
-    total: Math.max(0, subtotal + vatAmount - discountAmount),
+    total,
     createdAt: Number(compact.d) || Date.now(),
     updatedAt: Number(compact.d) || Date.now(),
     isShared: true,
@@ -598,84 +641,9 @@ function parseThaiBill(ocrText, tsv) {
   return tableItems.length > 0 ? tableItems : parseThaiBillText(ocrText);
 }
 
-const HISTORY_DATABASE = 'harn-kun-history';
-const HISTORY_STORE = 'operations';
-
-function openHistoryDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(HISTORY_DATABASE, 1);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(HISTORY_STORE)) {
-        database.createObjectStore(HISTORY_STORE, { keyPath: 'id' });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function saveHistoryRecord(record) {
-  const database = await openHistoryDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(HISTORY_STORE, 'readwrite');
-    transaction.objectStore(HISTORY_STORE).put(record);
-    transaction.oncomplete = () => {
-      database.close();
-      resolve();
-    };
-    transaction.onerror = () => {
-      database.close();
-      reject(transaction.error);
-    };
-  });
-}
-
-async function readHistoryRecords() {
-  const database = await openHistoryDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(HISTORY_STORE, 'readonly');
-    const request = transaction.objectStore(HISTORY_STORE).getAll();
-    request.onsuccess = () => resolve(request.result.sort((a, b) => b.updatedAt - a.updatedAt));
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => database.close();
-  });
-}
-
-async function clearHistoryRecords() {
-  const database = await openHistoryDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(HISTORY_STORE, 'readwrite');
-    transaction.objectStore(HISTORY_STORE).clear();
-    transaction.oncomplete = () => {
-      database.close();
-      resolve();
-    };
-    transaction.onerror = () => {
-      database.close();
-      reject(transaction.error);
-    };
-  });
-}
-
-async function deleteHistoryRecord(recordId) {
-  const database = await openHistoryDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(HISTORY_STORE, 'readwrite');
-    transaction.objectStore(HISTORY_STORE).delete(recordId);
-    transaction.oncomplete = () => {
-      database.close();
-      resolve();
-    };
-    transaction.onerror = () => {
-      database.close();
-      reject(transaction.error);
-    };
-  });
-}
-
 function App() {
   useVisitorAnalytics();
+  useDialogKeyboard();
   const isSharedHistoryRoute = window.location.pathname === '/history';
   const [showIntro, setShowIntro] = useState(() => {
     if (typeof window === 'undefined' || isSharedHistoryRoute) return false;
@@ -689,6 +657,9 @@ function App() {
   const [historyRecords, setHistoryRecords] = useState([]);
   const [selectedHistory, setSelectedHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyWarning, setHistoryWarning] = useState('');
+  const [historyDetailError, setHistoryDetailError] = useState('');
+  const [historySaved, setHistorySaved] = useState(false);
   const [historySort, setHistorySort] = useState('newest');
   const [sortDrawerOpen, setSortDrawerOpen] = useState(false);
   const [clearHistoryConfirmOpen, setClearHistoryConfirmOpen] = useState(false);
@@ -698,6 +669,7 @@ function App() {
   const [removingHistoryId, setRemovingHistoryId] = useState(null);
   const [historyDeleteInputLocked, setHistoryDeleteInputLocked] = useState(false);
   const [activeHistoryId, setActiveHistoryId] = useState(null);
+  const [activeHistoryUpdatedAt, setActiveHistoryUpdatedAt] = useState(null);
   const [step, setStep] = useState('friends');
   const [peopleNameConfirmed, setPeopleNameConfirmed] = useState(false);
   const [manualComposerOpen, setManualComposerOpen] = useState(false);
@@ -749,6 +721,7 @@ function App() {
   const billListRef = useRef(null);
   const billEditorRef = useRef(null);
   const workflowCloseTimerRef = useRef(null);
+  const scanInFlightRef = useRef(false);
   const pageInteractionBlockersRef = useRef(null);
   pageInteractionBlockersRef.current = { isCreating, billPhotoOpen, clearHistoryConfirmOpen, historyView };
 
@@ -1014,13 +987,11 @@ function App() {
     };
   }, [billPhotoOpen]);
 
-  const subtotal = useMemo(
-    () => billItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
-    [billItems],
+  const { subtotal, vatAmount, appliedDiscount, total } = getBillTotals(
+    billItems.map(item => ({ ...item, amount: isValidMoney(item.amount) ? item.amount : 0 })),
+    vatEnabled, isValidMoney(vatRate) ? Math.min(100, Number(vatRate)) : 0,
+    discountEnabled, isValidMoney(discountAmount) ? discountAmount : 0,
   );
-  const vatAmount = vatEnabled ? subtotal * Math.max(0, Number(vatRate) || 0) / 100 : 0;
-  const appliedDiscount = discountEnabled ? Math.max(0, Number(discountAmount) || 0) : 0;
-  const total = Math.max(0, subtotal + vatAmount - appliedDiscount);
 
   const sortedHistoryRecords = useMemo(() => {
     const records = [...historyRecords];
@@ -1074,19 +1045,28 @@ function App() {
   useEffect(() => {
     const viewport = window.visualViewport;
     let largestHeight = viewport?.height ?? window.innerHeight;
+    let baselineWidth = window.innerWidth;
+    let keyboardWasOpen = false;
     let focusTimer;
+    let focusFrame;
 
     const syncViewport = () => {
+      // A pinch zoom changes the visual viewport without opening a keyboard.
+      if ((viewport?.scale ?? 1) > 1.1) return;
       const visibleHeight = viewport?.height ?? window.innerHeight;
+      if (Math.abs(window.innerWidth - baselineWidth) > 100) {
+        baselineWidth = window.innerWidth;
+        largestHeight = Math.max(window.innerHeight, visibleHeight);
+      }
       largestHeight = Math.max(largestHeight, visibleHeight);
       const activeElement = document.activeElement;
-      const inputIsFocused = ['INPUT', 'TEXTAREA'].includes(activeElement?.tagName)
+      const inputIsFocused = activeElement?.matches?.('textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="range"])')
         || activeElement?.isContentEditable;
-      // Pinch zoom also makes visualViewport.height smaller. Do not mistake that
-      // for the software keyboard or the UI will jump while the user zooms.
-      const keyboardIsOpen = inputIsFocused
-        && (viewport?.scale ?? 1) < 1.1
+      // Keep the compact layout while the keyboard closes after a button tap.
+      // Expanding it immediately on blur can move that button before click fires.
+      const keyboardIsOpen = (inputIsFocused || keyboardWasOpen)
         && visibleHeight < largestHeight - 120;
+      keyboardWasOpen = keyboardIsOpen;
 
       document.documentElement.style.setProperty('--visible-height', `${Math.round(visibleHeight)}px`);
       document.documentElement.style.setProperty(
@@ -1095,12 +1075,20 @@ function App() {
       );
       document.body.classList.toggle('keyboard-open', keyboardIsOpen);
 
-      if (keyboardIsOpen && activeElement instanceof HTMLElement) {
-        window.requestAnimationFrame(() => {
+      window.cancelAnimationFrame(focusFrame);
+      if (inputIsFocused && activeElement instanceof HTMLElement) {
+        focusFrame = window.requestAnimationFrame(() => {
+          if (!activeElement.isConnected) return;
           const rect = activeElement.getBoundingClientRect();
-          const visibleTop = viewport?.offsetTop ?? 0;
-          const visibleBottom = visibleTop + visibleHeight;
-          if (rect.top < visibleTop + 12 || rect.bottom > visibleBottom - 12) {
+          const scroller = activeElement.closest('.guided-body');
+          const bounds = scroller?.getBoundingClientRect();
+          const visibleTop = Math.max(viewport?.offsetTop ?? 0, bounds?.top ?? 0) + 12;
+          const visibleBottom = Math.min((viewport?.offsetTop ?? 0) + visibleHeight, bounds?.bottom ?? Infinity) - 12;
+          if (scroller && rect.bottom > visibleBottom) {
+            scroller.scrollTop += rect.bottom - visibleBottom;
+          } else if (scroller && rect.top < visibleTop) {
+            scroller.scrollTop -= visibleTop - rect.top;
+          } else if (!scroller && (rect.top < visibleTop || rect.bottom > visibleBottom)) {
             activeElement.scrollIntoView({ block: 'center', inline: 'nearest' });
           }
         });
@@ -1117,6 +1105,8 @@ function App() {
 
     const resetViewportBaseline = () => {
       largestHeight = viewport?.height ?? window.innerHeight;
+      baselineWidth = window.innerWidth;
+      keyboardWasOpen = false;
       syncViewport();
     };
 
@@ -1127,9 +1117,15 @@ function App() {
     window.addEventListener('orientationchange', resetViewportBaseline);
     document.addEventListener('focusin', syncAfterFocusChange);
     document.addEventListener('focusout', syncAfterFocusChange);
+    // Errors, optional fields and editor changes can resize the space above the
+    // pinned action without emitting a browser viewport resize.
+    const contentObserver = new MutationObserver(syncViewport);
+    contentObserver.observe(document.getElementById('root'), { childList: true, subtree: true });
 
     return () => {
       window.clearTimeout(focusTimer);
+      window.cancelAnimationFrame(focusFrame);
+      contentObserver.disconnect();
       viewport?.removeEventListener('resize', syncViewport);
       viewport?.removeEventListener('scroll', syncViewport);
       window.removeEventListener('resize', syncViewport);
@@ -1141,53 +1137,34 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const preventGestureZoom = (event) => event.preventDefault();
-    const preventMultiTouchZoom = (event) => {
-      if (event.touches?.length > 1) event.preventDefault();
-    };
-    const preventWheelZoom = (event) => {
-      if (event.ctrlKey || event.metaKey) event.preventDefault();
-    };
-    const preventKeyboardZoom = (event) => {
-      if ((event.ctrlKey || event.metaKey) && ['+', '-', '=', '0'].includes(event.key)) {
-        event.preventDefault();
-      }
-    };
-
-    document.addEventListener('gesturestart', preventGestureZoom, { passive: false });
-    document.addEventListener('gesturechange', preventGestureZoom, { passive: false });
-    document.addEventListener('gestureend', preventGestureZoom, { passive: false });
-    document.addEventListener('touchmove', preventMultiTouchZoom, { passive: false });
-    document.addEventListener('wheel', preventWheelZoom, { passive: false });
-    document.addEventListener('keydown', preventKeyboardZoom);
-
-    return () => {
-      document.removeEventListener('gesturestart', preventGestureZoom);
-      document.removeEventListener('gesturechange', preventGestureZoom);
-      document.removeEventListener('gestureend', preventGestureZoom);
-      document.removeEventListener('touchmove', preventMultiTouchZoom);
-      document.removeEventListener('wheel', preventWheelZoom);
-      document.removeEventListener('keydown', preventKeyboardZoom);
-    };
-  }, []);
-
-  useEffect(() => {
     if (isCreating && step === 'friends' && peopleNameConfirmed) inputRef.current?.focus();
   }, [isCreating, step, peopleNameConfirmed]);
 
   useEffect(() => {
     let active = true;
     setHistoryLoading(true);
-    readHistoryRecords()
-      .then((records) => {
-        if (active) setHistoryRecords(records);
-      })
-      .catch((historyError) => console.error('Could not load recent bills:', historyError))
-      .finally(() => {
-        if (active) setHistoryLoading(false);
-      });
-    return () => { active = false; };
+    let generation = 0;
+    const reloadHistory = async () => {
+      const current = ++generation;
+      try {
+        const { records, invalidCount } = await readHistoryRecords();
+        if (!active || current !== generation) return;
+        setHistoryRecords(records);
+        setHistoryWarning(invalidCount ? `${invalidCount} saved bill(s) could not be displayed. Their data has been kept on this device.` : '');
+      } catch {
+        if (active && current === generation) setHistoryWarning('Recent bills are unavailable. Check browser storage permissions and try again.');
+      } finally {
+        if (active && current === generation) setHistoryLoading(false);
+      }
+    };
+    reloadHistory();
+    const unsubscribe = subscribeHistoryChanges(reloadHistory);
+    return () => { active = false; unsubscribe(); };
   }, []);
+
+  useEffect(() => {
+    if (historyRecords.length > 0 && !isSharedHistoryRoute) warmAppStyles();
+  }, [historyRecords.length, isSharedHistoryRoute]);
 
   useEffect(() => {
     if (editingBillIndex === null) return undefined;
@@ -1260,6 +1237,8 @@ function App() {
 
     await loadAppStyles();
     setActiveHistoryId(null);
+    setActiveHistoryUpdatedAt(null);
+    setHistorySaved(false);
     setWorkflowDirection('forward');
     setStep('friends');
     setPeopleNameConfirmed(false);
@@ -1340,7 +1319,13 @@ function App() {
       return;
     }
     setSortDrawerOpen(false);
-    await loadAppStyles();
+    try {
+      await loadAppStyles();
+    } catch {
+      setHistoryDetailError('Bill details could not load. Tap the bill to try again.');
+      return;
+    }
+    setHistoryDetailError('');
     setSelectedHistory(record);
     setHistoryView('detail');
     setMenuOpenRequest((request) => request + 1);
@@ -1355,6 +1340,8 @@ function App() {
     setWorkflowDirection('forward');
     setSortDrawerOpen(false);
     setActiveHistoryId(record.id);
+    setActiveHistoryUpdatedAt(record.updatedAt);
+    setHistorySaved(false);
     setEventName(record.eventName);
     setFriendName('');
     setFriends([...record.friends]);
@@ -1558,7 +1545,7 @@ function App() {
   };
 
   const scanBill = async (file) => {
-    if (!file) return;
+    if (!file || scanInFlightRef.current) return;
     if (cooldownRemaining > 0) {
       setError(`Please wait ${cooldownRemaining} seconds before scanning another bill.`);
       return;
@@ -1569,17 +1556,17 @@ function App() {
     }
 
     let uploadFile;
+    scanInFlightRef.current = true;
     try {
       uploadFile = await prepareBillUpload(file);
     } catch (compressionError) {
+      scanInFlightRef.current = false;
       setError(compressionError instanceof Error ? compressionError.message : 'Could not prepare this photo.');
       return;
     }
 
     if (billImageUrl) URL.revokeObjectURL(billImageUrl);
     setBillImageUrl(URL.createObjectURL(uploadFile));
-    setBillItems([]);
-    setAllocations([]);
     setEditingBillIndex(null);
     setRawOcrText('');
     setOcrStatus('scanning');
@@ -1597,6 +1584,7 @@ function App() {
       const response = await fetch('/api/scan-bill', {
         method: 'POST',
         body: formData,
+        signal: AbortSignal.timeout(60_000),
       });
       const responseText = await response.text();
       let result;
@@ -1615,7 +1603,10 @@ function App() {
 
       setOcrProgress(1);
       setRawOcrText(text);
-      setBillItems(detectedItems);
+      if (detectedItems.length > 0) {
+        setBillItems(detectedItems);
+        setAllocations(detectedItems.map(() => []));
+      }
       setEditingBillIndex(null);
       setOcrStatus('review');
       if (detectedItems.length === 0) {
@@ -1626,6 +1617,7 @@ function App() {
       const message = scanError instanceof Error ? scanError.message : String(scanError || 'Unknown scanning error');
       setError(`Could not scan this photo: ${message}`);
     } finally {
+      scanInFlightRef.current = false;
       window.clearInterval(progressTimer);
     }
   };
@@ -1858,6 +1850,7 @@ function App() {
 
   const addManualItemFromComposer = (event) => {
     event.preventDefault();
+    if (billItems.length >= 1000) { setError('This bill can contain up to 1,000 items.'); return; }
     const name = manualItemName.trim();
     const amount = Number(manualItemPrice);
     const quantity = Number(manualQuantity);
@@ -1869,7 +1862,11 @@ function App() {
       setError('Quantity must be at least 1.');
       return;
     }
-    setBillItems((currentItems) => [...currentItems, { name, quantity, amount: Number(amount.toFixed(2)) }]);
+    if (!isValidMoney(amount)) {
+      setError(`Prices must be between 0 and ${MAX_BAHT.toLocaleString()} baht.`);
+      return;
+    }
+    setBillItems((currentItems) => [...currentItems, { name, quantity, amount: toSatang(amount) / 100 }]);
     setAllocations((current) => [...current, []]);
     setOcrStatus('review');
     setManualItemName('');
@@ -1881,10 +1878,17 @@ function App() {
   };
 
   const startSplitting = () => {
+    if (billItems.length > 1000 || billItems.some(item => !item.name.trim() || !isValidMoney(item.amount)
+      || !Number.isSafeInteger(Number(item.quantity)) || Number(item.quantity) < 1)
+      || (vatEnabled && (!isValidMoney(vatRate) || Number(vatRate) > 100))
+      || (discountEnabled && !isValidMoney(discountAmount))) {
+      setError('Check every item name, non-negative price, whole quantity, VAT (0–100%), and discount before continuing.');
+      return;
+    }
     const cleanItemEntries = billItems
       .map((item, index) => ({ item, index }))
       .filter(({ item }) => item.name.trim());
-    const cleanItems = cleanItemEntries.map(({ item }) => item);
+    const cleanItems = cleanItemEntries.map(({ item }) => ({ ...item, amount: toSatang(item.amount) / 100, quantity: Number(item.quantity) }));
     if (cleanItems.length === 0) {
       setError('Add at least one bill item before splitting.');
       return;
@@ -1927,7 +1931,7 @@ function App() {
     billItems.forEach((item, itemIndex) => {
       const selectedFriends = allocations[itemIndex] || [];
       if (selectedFriends.length === 0) return;
-      const itemCents = Math.round((Number(item.amount) || 0) * 100);
+      const itemCents = toSatang(item.amount);
       const baseShare = Math.floor(itemCents / selectedFriends.length);
       const remainder = itemCents % selectedFriends.length;
 
@@ -1942,15 +1946,18 @@ function App() {
     if (assignedCents > 0 && targetCents !== assignedCents) {
       const proportional = friends.map((friend) => ({
         friend,
-        exact: centsByFriend[friend] * targetCents / assignedCents,
+        numerator: BigInt(centsByFriend[friend]) * BigInt(targetCents),
       }));
       let distributedCents = 0;
       proportional.forEach((entry) => {
-        centsByFriend[entry.friend] = Math.floor(entry.exact);
+        centsByFriend[entry.friend] = Number(entry.numerator / BigInt(assignedCents));
         distributedCents += centsByFriend[entry.friend];
       });
       proportional
-        .sort((left, right) => (right.exact - Math.floor(right.exact)) - (left.exact - Math.floor(left.exact)))
+        .sort((left, right) => {
+          const a = left.numerator % BigInt(assignedCents), b = right.numerator % BigInt(assignedCents);
+          return a === b ? 0 : a > b ? -1 : 1;
+        })
         .slice(0, targetCents - distributedCents)
         .forEach((entry) => { centsByFriend[entry.friend] += 1; });
     }
@@ -1966,13 +1973,6 @@ function App() {
     setError('');
 
     try {
-      const response = await fetch('/api/operations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventName, friends, billItems, allocations, settlements: calculatedSettlements, rawOcrText, subtotal, vatEnabled, vatRate, vatAmount, discountEnabled, discountAmount: appliedDiscount, total }),
-      });
-
-      if (!response.ok) throw new Error('Could not create the operation.');
       const historyId = activeHistoryId || crypto.randomUUID?.() || `operation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const now = Date.now();
       const historyRecord = {
@@ -1993,17 +1993,21 @@ function App() {
         updatedAt: now,
       };
 
+      let saved = false;
       try {
-        await saveHistoryRecord(historyRecord);
+        await saveHistoryRecord(historyRecord, activeHistoryId ? activeHistoryUpdatedAt : null);
         setActiveHistoryId(historyId);
+        setActiveHistoryUpdatedAt(now);
         setHistoryRecords((records) => [historyRecord, ...records.filter((record) => record.id !== historyId)]);
+        saved = true;
       } catch (historyError) {
-        console.error('Could not save local history:', historyError);
+        setError(`This split could not be saved. Keep this page open or download a picture. ${historyError.message || 'Check available browser storage and retry.'}`);
       }
+      setHistorySaved(saved);
       setSettlements(calculatedSettlements);
       // The completed operation is already stored in History. Keep its summary
       // visible, but make the next Start action open a clean draft immediately.
-      setHasActiveDraft(false);
+      setHasActiveDraft(!saved);
       setWorkflowDirection('forward');
       setStep('result');
     } catch (requestError) {
@@ -2087,7 +2091,7 @@ function App() {
       const summaryAllocations = savedRecord?.allocations ?? allocations;
       const summarySettlements = savedRecord?.settlements ?? settlements;
       const summaryTotal = Number(savedRecord?.total ?? total);
-      const storedShareRecord = savedRecord || historyRecords.find((record) => record.id === activeHistoryId);
+      const storedShareRecord = savedRecord || (historySaved ? historyRecords.find((record) => record.id === activeHistoryId) : null);
       const shareRecord = storedShareRecord || {
         eventName: summaryEventName,
         friends: savedRecord?.friends ?? friends,
@@ -2429,7 +2433,6 @@ function App() {
                 <div className="shared-receipt-items">
                   {selectedHistory.billItems.map((item, index) => {
                     const sharedWith = selectedHistory.allocations[index] || [];
-                    const amountPerPerson = sharedWith.length > 0 ? Number(item.amount) / sharedWith.length : 0;
                     return (
                       <article className="shared-receipt-item" key={`${item.name}-${index}`}>
                         <header>
@@ -2444,8 +2447,8 @@ function App() {
                           <span>SHARED WITH {sharedWith.length} {sharedWith.length === 1 ? 'PERSON' : 'PEOPLE'}</span>
                           {sharedWith.length > 0 ? (
                             <div>
-                              {sharedWith.map((friend) => (
-                                <span key={friend}><strong>{friend}</strong><small>฿{amountPerPerson.toFixed(2)}</small></span>
+                              {sharedWith.map((friend, friendIndex) => (
+                                <span key={friend}><strong>{friend}</strong><small>฿{itemShare(item.amount, sharedWith.length, friendIndex).toFixed(2)}</small></span>
                               ))}
                             </div>
                           ) : <p>No people selected for this item.</p>}
@@ -2516,8 +2519,9 @@ function App() {
               <path className="home-brand-leaf" d="M25 3c1-3 3-4 6-3-1 3-3 4-6 3Z" />
             </svg>
             <h1 onClick={handleBrandHistoryClick}>Harn Kun</h1>
+            <a className="home-language-switch" href="/th/" lang="th" aria-label="เปลี่ยนภาษาเป็นภาษาไทย">ไทย</a>
           </div>
-          <p>Split any bill, share every expense clearly.</p>
+          <p>Split bills with friends, scan receipts, and see who owes what.</p>
           <div className="home-hero">
             <div className="home-hero-copy">
               <span>LESS MATH. MORE MEMORIES.</span>
@@ -2546,7 +2550,6 @@ function App() {
           ref={homeCreateButtonRef}
           type="button"
           className="home-create-button home-create-featured home-create-primary"
-          aria-label={hasActiveDraft ? 'Resume splitting the current bill' : 'Create a new bill split'}
           aria-expanded={isCreating}
           onClick={openPanel}
         >
@@ -2598,6 +2601,8 @@ function App() {
           </div>
         </div>
 
+        {historyWarning && <p className="form-error" role="alert">{historyWarning}</p>}
+        {historyDetailError && <p className="form-error" role="alert">{historyDetailError}</p>}
         <div className={`home-history-list${!historyLoading && historyRecords.length === 0 ? ' is-empty' : ''}`} aria-live="polite">
           {historyLoading && (
             <div className="home-history-skeleton" role="status" aria-label="Loading recent bills">
@@ -2655,7 +2660,12 @@ function App() {
                 type="button"
                 className={`history-card home-history-card${homeHistorySwipe.id === record.id ? ' is-swiping' : ''}`}
                 style={{ transform: `translate3d(${homeHistorySwipe.id === record.id ? homeHistorySwipe.offset : 0}px, 0, 0)` }}
-                onPointerDown={(event) => beginHomeHistorySwipe(event, record)}
+                onPointerDown={(event) => {
+                  warmAppStyles();
+                  beginHomeHistorySwipe(event, record);
+                }}
+                onPointerEnter={warmAppStyles}
+                onFocus={warmAppStyles}
                 onPointerMove={moveHomeHistorySwipe}
                 onPointerUp={(event) => finishHomeHistorySwipe(event, record)}
                 onPointerCancel={cancelHomeHistorySwipe}
@@ -2795,11 +2805,11 @@ function App() {
         ocrProgress, cooldownRemaining, cameraFlow, pendingCameraUrl, cropAspect,
         cropBaseSize, cropTransform, isCropping, editingBillIndex, vatEnabled, vatRate,
         discountEnabled, discountAmount, subtotal, vatAmount, appliedDiscount, total,
-        allocations, isSaving, settlements, peopleNameConfirmed, manualComposerOpen,
+        allocations, isSaving, settlements, historySaved, finishSplitting, peopleNameConfirmed, manualComposerOpen,
         manualItemName, manualItemPrice, manualQuantity, showManualQuantity, showBillExtras,
         inputRef, manualNameRef, cameraInputRef, uploadInputRef, cropWorkspaceRef,
         cropFrameRef, cropImageRef, billListRef, billEditorRef,
-        closePanel, closeCameraFlow, guidedGoBack, setEventName, setFriendName, addFriend, removeFriend,
+        closePanel, closeCameraFlow, guidedGoBack, setError, setEventName, setFriendName, addFriend, removeFriend,
         setPeopleNameConfirmed, continueToBill, startCameraFlow, chooseCameraBill,
         chooseBill, beginCropDrag, moveCropDrag, endCropDrag, zoomCropWithWheel,
         toggleCropAspect, initializeCropEditor, confirmCameraBill, setBillPhotoOpen,

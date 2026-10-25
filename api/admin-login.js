@@ -52,7 +52,7 @@ export default {
       } catch {
         return json({ message: 'A valid password is required.' }, 400);
       }
-      const password = typeof body.password === 'string' ? body.password : '';
+      const password = typeof body?.password === 'string' ? body.password : '';
       if (!password || password.length > 256 || !verifyAdminPassword(password)) {
         await recordFailedLogin(clientAddress);
         return json({ message: 'Incorrect password.' }, 401);
@@ -65,7 +65,7 @@ export default {
         { 'Set-Cookie': adminSessionCookie(request, createAdminSession()) },
       );
     } catch (error) {
-      if (!(error instanceof AnalyticsSetupError)) console.error('Admin login failed:', error);
+      if (!(error instanceof AnalyticsSetupError)) console.error('Admin login failed.');
       return json({ message: 'Admin service is temporarily unavailable.' }, 503);
     }
   },

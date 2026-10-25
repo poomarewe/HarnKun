@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="แอปหารบิลและหารค่าอาหารกับเพื่อนฟรี เพิ่มรายการ สแกนใบเสร็จ แบ่งค่าใช้จ่ายตามคน และดูยอดที่แต่ละคนต้องจ่ายได้ง่าย ๆ ไม่ต้องสมัครสมาชิก" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#ebe8f3" />
+    <link rel="canonical" href="https://harn.fun/th/" />
+    <link rel="alternate" hreflang="en" href="https://harn.fun/" />
+    <link rel="alternate" hreflang="th-TH" href="https://harn.fun/th/" />
+    <link rel="alternate" hreflang="x-default" href="https://harn.fun/" />
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Harn Kun" />
+    <meta property="og:locale" content="th_TH" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:title" content="แอปหารบิล หารค่าอาหารกับเพื่อนฟรี | Harn Kun" />
+    <meta property="og:description" content="เพิ่มรายการอาหาร แบ่งบิลตามคน และดูยอดที่เพื่อนแต่ละคนต้องจ่ายได้ง่าย ๆ ฟรี ไม่ต้องสมัครสมาชิก" />
+    <meta property="og:url" content="https://harn.fun/th/" />
+    <meta property="og:image" content="https://harn.fun/icon.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="ไอคอนแอป Harn Kun" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="แอปหารบิล หารค่าอาหารกับเพื่อนฟรี | Harn Kun" />
+    <meta name="twitter:description" content="เพิ่มรายการอาหาร แบ่งบิลตามคน และดูยอดที่เพื่อนแต่ละคนต้องจ่ายได้ง่าย ๆ ฟรี ไม่ต้องสมัครสมาชิก" />
+    <meta name="twitter:image" content="https://harn.fun/icon.png" />
+    <title>แอปหารบิล หารค่าอาหารกับเพื่อนฟรี | Harn Kun</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "@id": "https://harn.fun/th/#webpage",
+        "url": "https://harn.fun/th/",
+        "name": "แอปหารบิล หารค่าอาหารกับเพื่อนฟรี | Harn Kun",
+        "description": "แอปหารบิลและหารค่าอาหารกับเพื่อนฟรี เพิ่มรายการ สแกนใบเสร็จ แบ่งค่าใช้จ่ายตามคน และดูยอดที่แต่ละคนต้องจ่ายได้ง่าย ๆ ไม่ต้องสมัครสมาชิก",
+        "inLanguage": "th-TH",
+        "isPartOf": { "@id": "https://harn.fun/#website" }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #242421;
+        --muted: #68675f;
+        --paper: #fbf8ef;
+        --card: #fffdf8;
+        --line: #e5decb;
+        --yellow: #ffe66a;
+        --coral: #f45f4c;
+        --green: #308660;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 92% 8%, #ffe66a66 0 10rem, transparent 10.1rem),
+          var(--paper);
+        font-family: Tahoma, "Noto Sans Thai", sans-serif;
+        font-size: 1rem;
+        line-height: 1.8;
+      }
+      a { color: inherit; }
+      .shell { width: min(100% - 32px, 960px); margin-inline: auto; }
+      .topbar { display: flex; min-height: 76px; align-items: center; justify-content: space-between; gap: 16px; }
+      .brand { color: var(--ink); font-size: 1.15rem; font-weight: 900; text-decoration: none; }
+      .language { color: var(--muted); font-size: .9rem; font-weight: 700; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+      .hero { padding: clamp(54px, 10vw, 108px) 0 64px; }
+      .eyebrow { margin: 0 0 14px; color: var(--green); font-size: .8rem; font-weight: 900; letter-spacing: .1em; }
+      h1, h2, p { margin-top: 0; }
+      h1 { max-width: 760px; margin-bottom: 18px; font-size: clamp(2.2rem, 7vw, 4.4rem); line-height: 1.25; letter-spacing: -.04em; }
+      .lead { max-width: 680px; margin-bottom: 26px; color: var(--muted); font-size: clamp(1.05rem, 2.7vw, 1.3rem); }
+      .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+      .button { display: inline-flex; min-height: 50px; align-items: center; justify-content: center; padding: 10px 20px; border: 2px solid var(--ink); border-radius: 14px; color: var(--ink); background: var(--yellow); box-shadow: 0 4px 0 var(--ink); font-weight: 900; text-decoration: none; }
+      .button:hover { transform: translateY(-2px); }
+      .text-link { color: var(--green); font-weight: 800; text-underline-offset: 4px; }
+      .section { padding: 48px 0; border-top: 1px solid var(--line); }
+      .section h2 { margin-bottom: 22px; font-size: clamp(1.5rem, 4vw, 2.25rem); line-height: 1.35; }
+      .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+      .card { padding: 22px; border: 1px solid var(--line); border-radius: 18px 18px 18px 6px; background: var(--card); }
+      .card strong { display: block; margin-bottom: 8px; }
+      .card p { margin-bottom: 0; color: var(--muted); }
+      .step { color: var(--green); font-size: .8rem; font-weight: 900; }
+      .faq { max-width: 760px; }
+      .faq-item { padding: 18px 0; border-bottom: 1px solid var(--line); }
+      .faq-item h3 { margin: 0 0 6px; font-size: 1.05rem; }
+      .faq-item p { margin: 0; color: var(--muted); }
+      footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 28px 0 38px; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+      footer a { color: var(--green); font-weight: 800; }
+      @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } .hero { padding-top: 54px; } .section { padding: 36px 0; } }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .button:hover { transform: none; } }
+    </style>
+  </head>
+  <body>
+    <header class="shell topbar">
+      <a class="brand" href="/" aria-label="Harn Kun หน้าหลัก">Harn Kun</a>
+      <a class="language" href="/" lang="en" aria-label="View the English page">English</a>
+    </header>
+    <main class="shell">
+      <section class="hero" aria-labelledby="page-title">
+        <p class="eyebrow">HARN KUN · เครื่องมือหารบิลกับเพื่อน</p>
+        <h1 id="page-title">แอปหารบิล หารค่าอาหารกับเพื่อนได้ง่าย ๆ</h1>
+        <p class="lead">หมดปัญหาหารค่าอาหารไม่ลงตัว เพิ่มรายการอาหารหรือสแกนใบเสร็จ เลือกว่าใครแชร์เมนูไหน แล้วดูยอดที่แต่ละคนต้องจ่ายได้ชัดเจนในที่เดียว</p>
+        <div class="actions">
+          <a class="button" href="/">เริ่มหารบิลฟรี</a>
+          <a class="text-link" href="#how-it-works">ดูวิธีใช้งาน</a>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="features-title">
+        <h2 id="features-title">หารค่าใช้จ่ายตามรายการ ให้ทุกคนจ่ายตามที่แชร์จริง</h2>
+        <div class="grid">
+          <article class="card">
+            <strong>เพิ่มรายการหรือสแกนใบเสร็จ</strong>
+            <p>กรอกรายการและราคาเอง หรือสแกนใบเสร็จแล้วตรวจสอบรายการก่อนนำไปแบ่ง</p>
+          </article>
+          <article class="card">
+            <strong>เลือกคนที่แชร์แต่ละเมนู</strong>
+            <p>แบ่งแต่ละรายการเฉพาะคนที่ร่วมทาน ไม่จำเป็นต้องหารยอดเท่ากันทั้งโต๊ะ</p>
+          </article>
+          <article class="card">
+            <strong>เช็กยอดที่แต่ละคนต้องจ่าย</strong>
+            <p>ดูสรุปค่าอาหารและส่วนแบ่งของทุกคน แล้วส่งรายละเอียดบิลให้เพื่อนตรวจสอบได้</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="how-it-works" aria-labelledby="steps-title">
+        <h2 id="steps-title">วิธีหารบิลกับเพื่อนใน 3 ขั้นตอน</h2>
+        <div class="grid">
+          <article class="card"><span class="step">ขั้นตอนที่ 1</span><strong>ใส่ชื่อบิลและเพิ่มรายชื่อเพื่อน</strong><p>เริ่มจากตั้งชื่อมื้ออาหารและเพิ่มทุกคนที่ร่วมจ่าย</p></article>
+          <article class="card"><span class="step">ขั้นตอนที่ 2</span><strong>เพิ่มอาหารและกำหนดคนที่แชร์</strong><p>เพิ่มเมนูจากใบเสร็จหรือกรอกเอง แล้วเลือกรายชื่อในแต่ละรายการ</p></article>
+          <article class="card"><span class="step">ขั้นตอนที่ 3</span><strong>ตรวจยอดและแชร์สรุป</strong><p>ตรวจว่าใครต้องจ่ายเท่าไร แล้วส่งลิงก์รายละเอียดแบบอ่านอย่างเดียวให้เพื่อน</p></article>
+        </div>
+      </section>
+
+      <section class="section faq" aria-labelledby="faq-title">
+        <h2 id="faq-title">คำถามเกี่ยวกับแอปหารบิล</h2>
+        <article class="faq-item">
+          <h3>หารค่าอาหารที่แต่ละคนกินไม่เท่ากันได้ไหม?</h3>
+          <p>ได้ เลือกคนที่แชร์ในแต่ละเมนู ระบบจะคำนวณส่วนแบ่งตามรายการและสรุปยอดชำระของแต่ละคน</p>
+        </article>
+        <article class="faq-item">
+          <h3>ใช้แอปหารบิลฟรีและไม่ต้องสมัครสมาชิกได้ไหม?</h3>
+          <p>เริ่มทำบิลได้ฟรีโดยไม่ต้องสร้างบัญชี เพิ่มรายชื่อเพื่อน รายการอาหาร และตรวจยอดได้เลย</p>
+        </article>
+        <article class="faq-item">
+          <h3>ประวัติบิลที่บันทึกไว้เก็บอยู่ที่ไหน?</h3>
+          <p>ประวัติบิลเก็บไว้ในเบราว์เซอร์ของอุปกรณ์ที่ใช้สร้างบิล ส่วนลิงก์แชร์เป็นรายละเอียดแบบอ่านอย่างเดียว ควรส่งให้เฉพาะผู้ที่ต้องการให้ดู</p>
+        </article>
+      </section>
+    </main>
+    <footer class="shell">
+      <span>Harn Kun · หารบิล หารค่าอาหารกับเพื่อน</span>
+      <a href="/">เปิดแอป Harn Kun</a>
+    </footer>
+  </body>
+</html>

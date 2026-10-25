@@ -1,6 +1,4 @@
 User-agent: *
 Allow: /
-Disallow: /history
-Disallow: /admin
 
-Sitemap: https://Harn.fun/sitemap.xml
+Sitemap: https://harn.fun/sitemap.xml

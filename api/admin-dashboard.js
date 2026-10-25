@@ -23,7 +23,7 @@ export default {
     try {
       return json(await getAnalyticsDashboard());
     } catch (error) {
-      if (!(error instanceof AnalyticsSetupError)) console.error('Admin dashboard failed:', error);
+      if (!(error instanceof AnalyticsSetupError)) console.error('Admin dashboard failed.');
       return json({ message: 'Analytics is temporarily unavailable.' }, 503);
     }
   },

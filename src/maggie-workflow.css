@@ -1131,6 +1131,10 @@ html[data-theme] body .maggie-shared-screen .shared-receipt-total span,
 html[data-theme] body .maggie-shared-screen .shared-receipt-title > div > span,
 html[data-theme] body .maggie-shared-screen .shared-receipt-section-heading > span { color: var(--mag-green); }
 
+/* Small labels need stronger contrast on the tinted badge and yellow total. */
+html[data-theme] body .maggie-shared-screen .shared-receipt-header > span,
+html[data-theme] body .maggie-shared-screen .shared-receipt-title .shared-receipt-total > span { color: var(--mag-ink); }
+
 html[data-theme] body .maggie-shared-screen .shared-receipt-number,
 html[data-theme] body .maggie-shared-screen .shared-receipt-payment > span,
 html[data-theme] body .maggie-shared-screen .shared-receipt-person > span {
@@ -1446,12 +1450,123 @@ html[data-theme] body .staggered-menu.maggie-menu .history-edit-icon-button:focu
   html[data-theme] body .guided-flow .camera-confirm-actions button { min-height: 40px; }
 }
 
+html[data-theme] body .guided-flow .guided-header-step,
+html[data-theme] body .guided-flow .guided-keyboard-dismiss,
+html[data-theme] body .guided-flow .guided-mobile-item-submit,
+html[data-theme] body .guided-flow .guided-mobile-quantity-toggle,
+html[data-theme] body .guided-flow .guided-mobile-edit-actions,
+html[data-theme] body .guided-flow .guided-mobile-error,
+html[data-theme] body .guided-flow .guided-footer .guided-footer-total,
+html[data-theme] body .guided-flow .guided-footer.has-mobile-only-action { display: none; }
+
+/* Keep the current task and its action together on phones, above the keyboard. */
 @media (max-width: 699px), (pointer: coarse) and (max-height: 600px) {
-  html[data-theme] body.keyboard-open .guided-flow .guided-body { padding-top: 9px; }
-  html[data-theme] body.keyboard-open .guided-flow .guided-stages { margin-bottom: 10px; }
-  html[data-theme] body.keyboard-open .guided-flow .guided-intro { margin-bottom: 9px; }
-  html[data-theme] body.keyboard-open .guided-flow .guided-description,
-  html[data-theme] body.keyboard-open .guided-flow .guided-trail { display: none; }
-  html[data-theme] body.keyboard-open .guided-flow .guided-footer { padding-top: 6px; }
+  html[data-theme] body .guided-flow .guided-header {
+    min-height: 54px;
+    gap: 8px;
+    padding: max(5px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 5px max(12px, env(safe-area-inset-left));
+  }
+  html[data-theme] body .guided-flow .guided-brand { gap: 5px; font-size: .85rem; }
+  html[data-theme] body .guided-flow .guided-header-step { display: block; margin-left: auto; font-size: .68rem; font-weight: 800; white-space: nowrap; }
+  html[data-theme] body .guided-flow .guided-header-actions { display: flex; gap: 6px; }
+  html[data-theme] body .guided-flow .guided-body { padding: 12px max(12px, env(safe-area-inset-right)) 16px max(12px, env(safe-area-inset-left)); scroll-padding-block: 12px; }
+  html[data-theme] body .guided-flow .guided-stages { gap: 5px; margin-bottom: 12px; }
+  html[data-theme] body .guided-flow .guided-stage { padding: 5px 2px; font-size: .6rem; box-shadow: none; }
+  html[data-theme] body .guided-flow .guided-intro { margin-bottom: 12px; }
+  html[data-theme] body .guided-flow .guided-title { font-size: clamp(1.35rem, 5.8vw, 1.7rem); line-height: 1.2; letter-spacing: -.045em; }
+  html[data-theme] body .guided-flow .guided-intro > .guided-kicker,
+  html[data-theme] body .guided-flow .guided-description,
+  html[data-theme] body .guided-flow .guided-trail,
+  html[data-theme] body .guided-flow .guided-empty-receipt { display: none; }
+  html[data-theme] body .guided-flow .guided-doodle-field { display: none; }
+  html[data-theme] body .guided-flow .guided-card,
+  html[data-theme] body .guided-flow .guided-side-panel { margin-bottom: 0; padding: 14px; border-radius: 17px; box-shadow: 0 3px 0 var(--flow-ink); }
+  html[data-theme] body .guided-flow .guided-prompt { margin-bottom: 10px; font-size: 1.05rem; }
+  html[data-theme] body .guided-flow .guided-field { gap: 5px; font-size: .72rem; }
+  html[data-theme] body .guided-flow input:not([type='checkbox']):not([type='file']) { min-height: 48px; padding: 9px 11px; font-size: 16px; line-height: 1.5; scroll-margin-block: 12px; }
+  html[data-theme] body .guided-flow.step-friends .guided-card > .guided-prompt { display: none; }
+  html[data-theme] body .guided-flow .guided-composer.guided-people-composer { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
+  html[data-theme] body .guided-flow .guided-people-composer > .guided-field { grid-column: 1; grid-row: 1; }
+  html[data-theme] body .guided-flow .guided-people-composer > .guided-action { grid-column: 2; grid-row: 1; width: auto; min-height: 48px; padding: 10px 13px; margin: 0; }
+  html[data-theme] body .guided-flow .guided-list-heading { margin-block: 10px 6px; gap: 8px; }
+  html[data-theme] body .guided-flow .guided-chip-list { max-height: min(22dvh, 152px); overflow-y: auto; overscroll-behavior: contain; margin: 6px 0 0; padding-bottom: 3px; }
+  html[data-theme] body .guided-flow .guided-chip { min-height: 44px; }
+  html[data-theme] body .guided-flow .guided-workspace { gap: 12px; }
+  html[data-theme] body .guided-flow .guided-options { gap: 8px; }
+  html[data-theme] body .guided-flow .guided-side .guided-option { min-height: 64px; padding: 9px 12px; }
+  html[data-theme] body .guided-flow .guided-side .guided-composer.guided-item-composer:has(> .guided-field:nth-child(2)) { grid-template-columns: minmax(0,1fr) minmax(94px,.65fr); gap: 8px; }
+  html[data-theme] body .guided-flow .guided-item-composer > .guided-action { display: none; }
+  html[data-theme] body .guided-flow .guided-entry-extras { margin-top: 5px; }
+  html[data-theme] body .guided-flow .guided-entry-extra-actions { gap: 4px 12px; }
+  html[data-theme] body .guided-flow .guided-entry-extra-actions > .guided-reveal { min-height: 44px; padding-block: 7px; }
+  html[data-theme] body .guided-flow .guided-entry-extra-actions > .guided-reveal.guided-inline-quantity-toggle { display: none; }
+  html[data-theme] body .guided-flow .guided-bill-controls .guided-side-tabs { margin-bottom: 10px; }
+  html[data-theme] body .guided-flow .guided-side-tab { padding: 8px 14px; min-height: 44px; }
+  html[data-theme] body .guided-flow .guided-bill-entry > .guided-prompt,
+  html[data-theme] body .guided-flow .guided-bill-entry:not(:has(.guided-item-composer)),
+  html[data-theme] body .guided-flow .guided-bill-options > .guided-note,
+  html[data-theme] body .guided-flow .guided-side-panel.guided-bill-end { display: none; }
+  html[data-theme] body .guided-flow .guided-adjustments { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; margin-block: 10px 0; align-items: center; }
+  html[data-theme] body .guided-flow .guided-adjustments > .guided-check { grid-column: 1; min-height: 48px; padding: 8px; }
+  html[data-theme] body .guided-flow .guided-adjustments > .guided-field { grid-column: 2; }
+  html[data-theme] body .guided-flow .guided-photo-row { margin-bottom: 10px; padding: 8px; }
+  html[data-theme] body .guided-flow .guided-photo-row strong { font-size: .8rem; }
+  html[data-theme] body .guided-flow .guided-photo-thumb { width: 44px; height: 44px; }
+  html[data-theme] body .guided-flow .guided-list,
+  html[data-theme] body .guided-flow .guided-result-list,
+  html[data-theme] body .guided-flow .guided-split-options { max-height: none; overflow: visible; }
+  html[data-theme] body .guided-flow .guided-list-row { padding: 9px; gap: 7px; }
+  html[data-theme] body .guided-flow .guided-list-row .guided-row-button { min-height: 44px; min-width: 44px; }
+  html[data-theme] body .guided-flow .guided-share-item { padding: 12px 14px; }
+  html[data-theme] body .guided-flow .guided-share-item > .guided-kicker { margin-bottom: 4px; font-size: .62rem; }
+  html[data-theme] body .guided-flow .guided-share-item h3 { margin-bottom: 6px; font-size: 1.25rem; }
+  html[data-theme] body .guided-flow .guided-side .guided-split-options { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  html[data-theme] body .guided-flow .guided-split-option { min-height: 52px; padding: 9px; gap: 7px; flex-wrap: wrap; }
+  html[data-theme] body .guided-flow .guided-split-option small { margin-left: 0; }
+  html[data-theme] body .guided-flow .guided-summary { gap: 4px; }
+  html[data-theme] body .guided-flow .guided-summary > .guided-kicker { display: none; }
+  html[data-theme] body .guided-flow .guided-summary h3 { margin: 0; font-size: 1.1rem; }
+  html[data-theme] body .guided-flow .guided-summary .guided-total { margin: 0; padding: 8px 10px; }
+  html[data-theme] body .guided-flow .guided-summary .guided-total strong { font-size: 1.4rem; }
+  html[data-theme] body .guided-flow .guided-result-list .guided-list-row { min-height: 52px; }
+  html[data-theme] body .guided-flow .guided-footer { min-height: 0; flex-direction: column; gap: 6px; padding: 8px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  html[data-theme] body .guided-flow .guided-footer.has-mobile-only-action { display: flex; }
+  html[data-theme] body .guided-flow .guided-footer > div { width: 100%; gap: 8px; }
+  html[data-theme] body .guided-flow .guided-footer .guided-action,
+  html[data-theme] body .guided-flow .guided-footer .guided-secondary { min-width: 0; min-height: 48px; flex: 1; margin: 0; padding: 10px 12px; font-size: .8rem; }
+  html[data-theme] body .guided-flow .guided-footer .guided-footer-total { display: flex; justify-content: space-between; align-items: center; font-size: .73rem; }
+  html[data-theme] body .guided-flow .guided-footer-total strong { overflow-wrap: anywhere; text-align: right; }
+  html[data-theme] body .guided-flow .guided-mobile-item-submit,
+  html[data-theme] body .guided-flow .guided-mobile-quantity-toggle { display: inline-flex; }
+  html[data-theme] body .guided-flow.has-mobile-item-action .guided-continue-sharing,
+  html[data-theme] body .guided-flow.is-editing-item .guided-continue-sharing,
+  html[data-theme] body .guided-flow.is-editing-item .guided-side,
+  html[data-theme] body .guided-flow.is-editing-item .guided-list-row:not(.guided-item-editor),
+  html[data-theme] body .guided-flow.is-editing-item .guided-item-editor .guided-inline-actions { display: none; }
+  html[data-theme] body .guided-flow .guided-mobile-edit-actions { display: flex; width: 100%; gap: 8px; }
+  html[data-theme] body .guided-flow .guided-item-editor { grid-template-columns: minmax(0,1fr) minmax(80px,.65fr); }
+  html[data-theme] body .guided-flow .guided-item-editor > .guided-field:first-child { grid-column: 1 / -1; }
+  html[data-theme] body .guided-flow .guided-item-editor > .guided-field:nth-of-type(3) { grid-column: 2; }
+  html[data-theme] body .guided-flow .guided-error { margin-block: 8px 0; padding: 8px 10px; }
+  html[data-theme] body .guided-flow .guided-desktop-error { display: none; }
+  html[data-theme] body .guided-flow footer.guided-footer:has(> .guided-mobile-error) { display: flex; }
+  html[data-theme] body .guided-flow .guided-footer > .guided-mobile-error { display: block; width: 100%; max-height: 66px; overflow-y: auto; margin: 0; padding: 7px 9px; font-size: .73rem; }
+
+  html[data-theme] body.keyboard-open .guided-flow .guided-body { padding-top: 8px; padding-bottom: 12px; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-stages,
+  html[data-theme] body.keyboard-open .guided-flow .guided-intro { display: none; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-brand { font-size: 0; gap: 0; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-brand > span { font-size: 1rem; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-header-step { margin-left: 0; margin-right: auto; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-keyboard-dismiss { display: inline-grid; width: 44px; height: 44px; place-items: center; padding: 10px; border: 1px solid var(--flow-ink); border-radius: 50%; color: var(--flow-ink); background: #fff; }
+  html[data-theme] body .guided-flow .guided-keyboard-dismiss svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-card,
+  html[data-theme] body.keyboard-open .guided-flow .guided-side-panel { padding: 10px; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-chip-list { max-height: 52px; }
+  html[data-theme] body.keyboard-open .guided-flow.step-friends .guided-list-heading { min-height: 24px; margin-block: 6px 2px; font-size: .72rem; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-footer { padding-top: 6px; padding-bottom: 8px; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-bill-controls .guided-side-tabs { margin-bottom: 6px; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-bill-controls:has(.guided-item-composer) .guided-side-tabs { display: none; }
+  html[data-theme] body.keyboard-open .guided-flow .guided-entry-extra-actions > .guided-reveal.guided-photo-alternative { display: none; }
 }
 

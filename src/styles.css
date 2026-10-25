@@ -3092,6 +3092,9 @@ html .bill-footer-actions .save-button {
 
 /* ReactBits-style Staggered Menu */
 .staggered-menu {
+  --menu-slide-duration: 160ms;
+  --menu-stagger: 20ms;
+  --menu-total-duration: calc(var(--menu-slide-duration) + var(--menu-stagger) * 2);
   position: fixed;
   inset: 0;
   /* Home-screen navigation sits above the hero, but below creation screens. */
@@ -3118,7 +3121,10 @@ html .bill-footer-actions .save-button {
   background: transparent;
   box-shadow: none;
   pointer-events: auto;
-  transition: color 180ms ease, transform 180ms ease;
+}
+
+html[data-theme] body .staggered-menu-toggle {
+  transition: color var(--menu-slide-duration) ease, transform var(--menu-slide-duration) ease;
 }
 
 .staggered-menu:not(.is-open) .staggered-menu-toggle {
@@ -3154,7 +3160,7 @@ html .bill-footer-actions .save-button {
   height: 2px;
   border-radius: 99px;
   background: currentColor;
-  transition: top 300ms var(--ease-out), transform 300ms var(--ease-out);
+  transition: top var(--menu-slide-duration) var(--ease-out), transform var(--menu-slide-duration) var(--ease-out);
 }
 
 .staggered-menu-toggle b:first-child {
@@ -3187,7 +3193,10 @@ html .bill-footer-actions .save-button {
   pointer-events: none;
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
-  transition: opacity 320ms ease, visibility 0s linear 700ms;
+}
+
+html[data-theme] body .staggered-menu-backdrop {
+  transition: opacity var(--menu-slide-duration) ease, visibility 0s linear var(--menu-total-duration);
 }
 
 .staggered-menu-layer,
@@ -3203,21 +3212,21 @@ html .bill-footer-actions .save-button {
 
 .staggered-menu-layer {
   pointer-events: none;
-  transition: transform 620ms var(--ease-out);
+  transition: transform var(--menu-slide-duration) var(--ease-out);
 }
 
 .staggered-menu-layer-back {
   z-index: 1;
   width: min(472px, 100%);
   background: #55206f;
-  transition-delay: 100ms;
+  transition-delay: calc(var(--menu-stagger) * 2);
 }
 
 .staggered-menu-layer-middle {
   z-index: 2;
   width: min(454px, 100%);
   background: #8f3bc2;
-  transition-delay: 50ms;
+  transition-delay: var(--menu-stagger);
 }
 
 .staggered-menu-panel {
@@ -3236,13 +3245,16 @@ html .bill-footer-actions .save-button {
     linear-gradient(160deg, #211329 0%, #130d18 78%);
   box-shadow: -24px 0 70px rgba(0, 0, 0, 0.3);
   pointer-events: none;
-  transition: transform 620ms var(--ease-out);
+  transition: transform var(--menu-slide-duration) var(--ease-out);
 }
 
 .staggered-menu.is-open .staggered-menu-backdrop {
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
+}
+
+html[data-theme] body .staggered-menu.is-open .staggered-menu-backdrop {
   transition-delay: 0s;
 }
 
@@ -3253,13 +3265,13 @@ html .bill-footer-actions .save-button {
 
 .staggered-menu.is-open .staggered-menu-layer-middle {
   transform: translate3d(0, 0, 0);
-  transition-delay: 70ms;
+  transition-delay: var(--menu-stagger);
 }
 
 .staggered-menu.is-open .staggered-menu-panel {
   transform: translate3d(0, 0, 0);
   pointer-events: auto;
-  transition-delay: 140ms;
+  transition-delay: calc(var(--menu-stagger) * 2);
 }
 
 
@@ -3345,6 +3357,7 @@ html .bill-footer-actions .save-button {
   .staggered-menu-layer,
   .staggered-menu-panel,
   .staggered-menu-panel nav button,
+  .staggered-menu-toggle,
   .staggered-menu-toggle b {
     transition-duration: 0.01ms !important;
     transition-delay: 0ms !important;

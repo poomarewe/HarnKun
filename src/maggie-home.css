@@ -78,6 +78,32 @@ html[data-theme] body .app.maggie-app .home-brand-row {
   gap: 8px;
 }
 
+html[data-theme] body .app.maggie-app .home-language-switch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 5px 9px;
+  border: 1px solid var(--mag-line);
+  border-radius: 10px;
+  color: var(--mag-ink);
+  background: var(--mag-card);
+  font-size: .68rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+html[data-theme] body .app.maggie-app .home-language-switch:hover {
+  background: var(--mag-yellow);
+}
+
+html[data-theme] body .app.maggie-app .home-language-switch:focus-visible {
+  outline: 3px solid var(--mag-coral);
+  outline-offset: 2px;
+}
+
 html[data-theme] body .app.maggie-app .home-brand-mark {
   width: 31px;
   height: 31px;
