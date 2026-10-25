@@ -1,18 +1,18 @@
 import { useEffect } from 'react';
+import { useAnalyticsConsent } from './analytics-consent.js';
+import { sendVisitorHeartbeat } from './visitor-analytics.js';
 
 const HEARTBEAT_INTERVAL_MS = 45_000;
 
 export default function useVisitorAnalytics() {
+  const consent = useAnalyticsConsent();
   useEffect(() => {
+    if (consent !== 'accepted') return undefined;
     let intervalId;
 
     const heartbeat = () => {
       if (document.visibilityState !== 'visible') return;
-      fetch('/api/analytics', {
-        method: 'POST',
-        credentials: 'same-origin',
-        keepalive: true,
-      }).catch(() => {});
+      sendVisitorHeartbeat();
     };
 
     const startHeartbeat = () => {
@@ -32,5 +32,5 @@ export default function useVisitorAnalytics() {
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [consent]);
 }

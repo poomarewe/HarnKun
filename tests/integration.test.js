@@ -38,12 +38,18 @@ test('real HTTP API method, malformed JSON, disabled services and unknown endpoi
     assert.equal(response.status, expected, path); await response.json();
   }
 });
-test('analytics setup failures do not disclose internal configuration details', async () => {
+test('analytics endpoints honor consent and keep admin endpoints protected', async () => {
   const response = await fetch(origin + '/api/analytics', { method: 'POST' });
-  assert.equal(response.status, 503);
-  const body = await response.json();
-  assert.deepEqual(body, { message: 'Analytics is temporarily unavailable.' });
-  assert.doesNotMatch(JSON.stringify(body), /DATABASE_URL|database is not configured/i);
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get('set-cookie'), null);
+  const bill = await fetch(origin + '/api/analytics-bills', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ historyId: 'test' }),
+  });
+  assert.equal(bill.status, 403);
+  const bills = await fetch(origin + '/api/admin-bills');
+  assert.equal(bills.status, 503);
+  const cleanup = await fetch(origin + '/api/analytics-cleanup');
+  assert.equal(cleanup.status, 401);
 });
 test('private environment values are absent from browser bundles (values never printed)', () => {
   let variables = {};

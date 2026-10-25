@@ -82,9 +82,9 @@ test('cookies have HTTPS flags and visitor validation', () => {
   for (const cookie of [adminSessionCookie(request, 'dummy'), visitorCookie(request, 'dummy')]) {
     assert.match(cookie, /HttpOnly/); assert.match(cookie, /Secure/);
   }
-  assert.equal(readVisitorId(new Request('https://test.invalid', { headers: { cookie: 'harn_visitor=bad' } })), null);
+  assert.equal(readVisitorId(new Request('https://test.invalid', { headers: { cookie: 'harn_analytics_visitor=bad' } })), null);
   const id = '90e48581-859c-4dd3-8327-2996b96cef68';
-  assert.equal(readVisitorId(new Request('https://test.invalid', { headers: { cookie: `harn_visitor=${id}` } })), id);
+  assert.equal(readVisitorId(new Request('https://test.invalid', { headers: { cookie: `harn_analytics_visitor=${id}` } })), id);
 });
 test('logout validates method and cross-origin requests', async () => {
   assert.equal((await logout.fetch(new Request('https://test.invalid'))).status, 405);
@@ -120,7 +120,7 @@ test('maximum supported bill and full/excess discounts retain exact integer tota
 test('malformed cookies do not throw or invalidate unrelated cookies', () => {
   const req = new Request('https://test.invalid', { headers: { cookie: `broken=%; harn_admin_session=${createAdminSession()}` } });
   assert.equal(hasValidAdminSession(req), true);
-  assert.equal(readVisitorId(new Request('https://test.invalid', { headers: { cookie: 'harn_visitor=%' } })), null);
+  assert.equal(readVisitorId(new Request('https://test.invalid', { headers: { cookie: 'harn_analytics_visitor=%' } })), null);
 });
 test('malformed history rows are rejected without altering their source', () => {
   const row = { id: 'bad', updatedAt: 1 };

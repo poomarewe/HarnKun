@@ -8,13 +8,17 @@ import adminDashboardHandler from './api/admin-dashboard.js';
 import adminLogoutHandler from './api/admin-logout.js';
 import scanBillHandler from './api/scan-bill.js';
 import operationsHandler from './api/operations.js';
+import analyticsBillsHandler from './api/analytics-bills.js';
+import analyticsRevokeHandler from './api/analytics-revoke.js';
+import adminBillsHandler from './api/admin-bills.js';
+import analyticsCleanupHandler from './api/analytics-cleanup.js';
 
 const app = express();
 app.set('trust proxy', 1);
 const port = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
 const rootDirectory = path.dirname(fileURLToPath(import.meta.url));
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
 
 function mountWebHandler(route, handler) {
   app.all(route, async (request, response, next) => {
@@ -34,7 +38,11 @@ function mountWebHandler(route, handler) {
         body: hasBody ? JSON.stringify(request.body || {}) : undefined,
       });
       const webResponse = await handler.fetch(webRequest);
-      webResponse.headers.forEach((value, name) => response.setHeader(name, value));
+      const setCookies = webResponse.headers.getSetCookie?.() || [];
+      webResponse.headers.forEach((value, name) => {
+        if (name !== 'set-cookie') response.setHeader(name, value);
+      });
+      if (setCookies.length) response.setHeader('Set-Cookie', setCookies);
       const body = Buffer.from(await webResponse.arrayBuffer());
       response.status(webResponse.status).send(body);
     } catch (error) {
@@ -44,8 +52,12 @@ function mountWebHandler(route, handler) {
 }
 
 mountWebHandler('/api/analytics', analyticsHandler);
+mountWebHandler('/api/analytics-bills', analyticsBillsHandler);
+mountWebHandler('/api/analytics-revoke', analyticsRevokeHandler);
+mountWebHandler('/api/analytics-cleanup', analyticsCleanupHandler);
 mountWebHandler('/api/admin-login', adminLoginHandler);
 mountWebHandler('/api/admin-dashboard', adminDashboardHandler);
+mountWebHandler('/api/admin-bills', adminBillsHandler);
 mountWebHandler('/api/admin-logout', adminLogoutHandler);
 
 // Share the production handlers so local QA exercises the same validation.

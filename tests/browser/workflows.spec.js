@@ -17,14 +17,20 @@ test.beforeEach(async ({ page }) => {
     const url = new URL(route.request().url());
     if (!['127.0.0.1', 'localhost'].includes(url.hostname)) return route.abort();
     if (url.pathname.startsWith('/_vercel/')) return route.fulfill({ contentType: 'application/javascript', body: '' });
-    if (url.pathname === '/api/analytics') return route.fulfill({ json: { recorded: true } });
+    if (url.pathname === '/api/analytics') return route.fulfill({ status: 200, headers: { 'Set-Cookie': 'harn_analytics_visitor=3f0d3e9a-9d2a-4dc1-9b32-57b5fc93f9b2; Path=/; SameSite=Lax' }, json: { recorded: true } });
+    if (url.pathname === '/api/analytics-bills') return route.fulfill({ status: 202, json: { recorded: true } });
+    if (url.pathname === '/api/analytics-revoke') return route.fulfill({ status: 204 });
+    if (url.pathname === '/api/admin-bills') return route.fulfill({ json: { bills: [], nextCursor: null } });
     if (url.pathname === '/api/operations') return route.fulfill({ status: 201, json: { message: 'Operation received.' } });
     return route.continue();
   });
 });
-async function home(page) {
+async function home(page, { consent = 'reject' } = {}) {
   await page.goto('/');
   await expect(page.getByRole('button', { name: /^Split a bill/ })).toBeVisible();
+  if (consent && await page.getByRole('button', { name: 'Reject analytics', exact: true }).count()) {
+    await page.getByRole('button', { name: 'Reject analytics', exact: true }).click();
+  }
 }
 async function people(page, names = ['A', 'B']) {
   await home(page);
@@ -81,6 +87,82 @@ async function noOverflow(page) {
   expect(sizes.body).toBeLessThanOrEqual(sizes.width + 1);
   if (sizes.dialog) expect(sizes.dialog.scroll).toBeLessThanOrEqual(sizes.dialog.client + 1);
 }
+
+test('analytics stays off until accepted; accepting records only a saved bill summary', async ({ page }) => {
+  const analyticsRequests = [];
+  page.on('request', request => {
+    if (/\/api\/(analytics|analytics-bills)(\?|$)/.test(request.url())) analyticsRequests.push(request);
+  });
+  await home(page, { consent: null });
+  await expect(page.getByRole('region', { name: 'Choose optional analytics' })).toBeVisible();
+  expect(analyticsRequests).toHaveLength(0);
+  await page.getByRole('button', { name: 'Accept analytics' }).click();
+  await bill(page);
+  await addItem(page, 'Pad Thai', '120.50');
+  const billRequest = page.waitForRequest(request => request.url().endsWith('/api/analytics-bills'));
+  await finish(page);
+  const sent = JSON.parse((await billRequest).postData());
+  expect(Object.keys(sent).sort()).toEqual(['historyId', 'items', 'participantCount', 'total']);
+  expect(sent).toMatchObject({ participantCount: 2, total: 120.5, items: [{ name: 'Pad Thai', amount: 120.5 }] });
+  expect(sent.historyId).toBeTruthy();
+  expect(JSON.stringify(sent)).not.toMatch(/Alice|Bob|friends|allocations|device|user.?agent/i);
+  await expect(page.getByRole('button', { name: 'Cookie settings' })).toBeVisible();
+});
+
+test('rejecting analytics keeps local bill splitting and history working without tracking', async ({ page }) => {
+  const tracked = [];
+  page.on('request', request => {
+    if (/\/api\/(analytics|analytics-bills)(\?|$)/.test(request.url())) tracked.push(request.url());
+  });
+  await home(page, { consent: null });
+  await page.getByRole('button', { name: 'Reject analytics' }).click();
+  await bill(page);
+  await addItem(page, 'Noodles', '80');
+  await finish(page);
+  await expect(page.getByText('Each person owes', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.locator('.home-history-card')).toHaveCount(1);
+  expect(tracked).toEqual([]);
+  await page.getByRole('button', { name: 'Cookie settings' }).click();
+  await expect(page.getByRole('button', { name: 'Accept analytics' })).toBeVisible();
+});
+
+test('accepting analytics never backfills bills already in local history', async ({ page }) => {
+  const billRequests = [];
+  page.on('request', request => {
+    if (request.url().endsWith('/api/analytics-bills')) billRequests.push(request);
+  });
+  await home(page, { consent: null });
+  await page.evaluate(async existingRecord => {
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('harn-kun-history', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('operations', { keyPath: 'id' });
+      req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('operations', 'readwrite');
+      tx.objectStore('operations').put(existingRecord);
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  }, record);
+  await page.reload();
+  await expect(page.locator('.home-history-card')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Accept analytics' }).click();
+  await page.waitForTimeout(250);
+  expect(billRequests).toHaveLength(0);
+  await expect(page.locator('.home-history-card')).toHaveCount(1);
+});
+
+test('Thai static page shows Thai consent and waits for acceptance before visit tracking', async ({ page }) => {
+  const tracked = [];
+  page.on('request', request => { if (request.url().endsWith('/api/analytics')) tracked.push(request.url()); });
+  await page.goto('/th/');
+  await expect(page.getByRole('region', { name: 'คุณเลือกการวิเคราะห์ข้อมูลได้' })).toBeVisible();
+  expect(tracked).toEqual([]);
+  await page.getByRole('button', { name: 'ยอมรับการวิเคราะห์' }).click();
+  await expect.poll(() => tracked.length).toBeGreaterThan(0);
+});
 
 for (const width of [320, 375, 390, 768, 1440]) {
   test(`${width}px full manual workflow, screenshot, persistence and QR`, async ({ page }, testInfo) => {
@@ -280,13 +362,25 @@ test('storage disabled does not crash home and browsers are isolated', async ({ 
 });
 test('mock admin login, dashboard, refresh, session expiry and logout', async ({ page }) => {
   let signedIn = false, calls = 0;
-  await page.route('**/api/admin-dashboard', route => { calls++; return route.fulfill({ status: signedIn ? 200 : 401, json: signedIn ? { onlineNow: 2, usersToday: 3, totalUsers: 4, onlineWindowMinutes: 2, history: [{ day: '2026-10-25', users: 3 }] } : { message: 'Authentication required.' } }); });
+  await page.route('**/api/admin-dashboard', route => { calls++; return route.fulfill({ status: signedIn ? 200 : 401, json: signedIn ? { onlineNow: 2, visitorsToday: 3, visitDays: 4, completedBills: 5, totalSpend: 100, onlineWindowMinutes: 2, history: [{ day: '2026-10-25', visitors: 3, bills: 2, spend: 100 }] } : { message: 'Authentication required.' } }); });
   await page.route('**/api/admin-login', route => { signedIn = true; return route.fulfill({ json: { authenticated: true } }); });
   await page.route('**/api/admin-logout', route => { signedIn = false; return route.fulfill({ json: {} }); });
+  await page.route('**/api/admin-bills**', route => {
+    const cursor = new URL(route.request().url()).searchParams.get('cursor');
+    return route.fulfill({ json: cursor
+      ? { bills: [{ historyId: 'local-2', updatedAt: '2026-10-24T01:00:00.000Z', total: 44, participantCount: 2, items: [{ name: 'Iced tea', amount: 44 }], deviceType: 'desktop', browser: 'Chrome', visitorId: 'Browser zyx98765' }], nextCursor: null }
+      : { bills: [{ historyId: 'local-1', updatedAt: '2026-10-25T01:00:00.000Z', total: 120.5, participantCount: 3, items: [{ name: 'Pad Thai', amount: 120.5 }], deviceType: 'mobile', browser: 'Safari', visitorId: 'Browser abc12345' }], nextCursor: 'next-page' } });
+  });
   await page.goto('/admin');
   await page.getByLabel('Admin password').fill('dummy');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Usage dashboard' })).toBeVisible();
+  const savedBill = page.locator('.admin-bill-row');
+  await expect(savedBill).toContainText('Pad Thai');
+  await expect(savedBill).toContainText('mobile · Safari');
+  await page.getByRole('button', { name: 'Load more bills' }).click();
+  await expect(page.locator('.admin-bill-row')).toHaveCount(2);
+  await expect(page.locator('.admin-bill-row').nth(1)).toContainText('Iced tea');
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   expect(calls).toBeGreaterThanOrEqual(2);
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
@@ -395,7 +489,7 @@ test('modal traps keyboard focus, closes on Escape; axe detects no serious/criti
   await expect(page.getByRole('dialog', { name: 'Bill step' })).toHaveCount(0);
 });
 test('admin failed logout stays visible and reports active session', async ({ page }) => {
-  await page.route('**/api/admin-dashboard', route => route.fulfill({ json: { onlineNow: 0, usersToday: 0, totalUsers: 0, onlineWindowMinutes: 2, history: [] } }));
+  await page.route('**/api/admin-dashboard', route => route.fulfill({ json: { onlineNow: 0, visitorsToday: 0, visitDays: 0, completedBills: 0, totalSpend: 0, onlineWindowMinutes: 2, history: [] } }));
   await page.route('**/api/admin-logout', route => route.abort());
   await page.goto('/admin');
   await page.getByRole('button', { name: 'Log out', exact: true }).click();

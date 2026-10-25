@@ -181,6 +181,7 @@
 .admin-metric span { color: #6d6279; font-weight: 700; }
 .admin-metric strong { font-size: clamp(2.2rem, 6vw, 4rem); line-height: 1; }
 .admin-metric small { color: #81778d; }
+.admin-metric strong { overflow-wrap: anywhere; }
 
 .admin-online span { display: flex; align-items: center; gap: 8px; }
 .admin-online span i {
@@ -197,6 +198,16 @@
   padding: clamp(22px, 4vw, 36px);
   border-radius: 28px;
 }
+
+.admin-bills-card { margin-top: 24px; }
+.admin-bill-list { display: grid; gap: 10px; }
+.admin-bill-row { overflow: hidden; border: 1px solid rgba(104, 75, 152, .18); border-radius: 16px; background: rgba(255, 255, 255, .45); }
+.admin-bill-row summary { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(200px, 1.3fr) auto auto; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; list-style-position: inside; }
+.admin-bill-row summary span { color: #6d6279; font-size: .86rem; }
+.admin-bill-row summary strong { white-space: nowrap; }
+.admin-bill-row ul { display: grid; gap: 6px; margin: 0; padding: 12px 20px 16px 42px; border-top: 1px solid rgba(104, 75, 152, .12); }
+.admin-bill-row li { display: flex; justify-content: space-between; gap: 14px; }
+.admin-bill-row li strong { white-space: nowrap; }
 
 .admin-section-heading {
   display: flex;
@@ -269,6 +280,9 @@
   .admin-metric { padding: 20px; }
   .admin-chart { display: none; }
   .admin-history-card { padding: 18px; border-radius: 22px 22px 22px 8px; }
+  .admin-bill-row summary { grid-template-columns: 1fr auto; gap: 5px 10px; }
+  .admin-bill-row summary span:nth-child(2) { grid-column: 1 / -1; }
+  .admin-bill-row summary strong { grid-column: 2; grid-row: 1; }
   .admin-history-table-wrap { display: block; max-height: min(48dvh, 420px); overflow: auto; overscroll-behavior: contain; }
   .admin-history-table-wrap table { width: 100%; min-width: 250px; border-collapse: collapse; }
   .admin-history-table-wrap th,

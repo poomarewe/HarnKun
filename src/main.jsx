@@ -11,6 +11,8 @@ import GuidedWorkflowView from './GuidedWorkflowView';
 import DoodleField, { Doodle } from './DecorativeDoodles';
 import AdminPanel from './AdminPanel';
 import useVisitorAnalytics from './useVisitorAnalytics';
+import { useAnalyticsConsent } from './analytics-consent.js';
+import { sendCompletedBillAnalytics } from './visitor-analytics.js';
 import useDialogKeyboard from './useDialogKeyboard';
 import { getBillTotals, isValidMoney, itemShare, MAX_BAHT, toSatang } from './money.js';
 import { saveHistoryRecord, readHistoryRecords, clearHistoryRecords, deleteHistoryRecord, subscribeHistoryChanges } from './history-store.js';
@@ -2073,6 +2075,7 @@ function App() {
         setError(`This split could not be saved. Keep this page open or download a picture. ${historyError.message || 'Check available browser storage and retry.'}`);
       }
       setHistorySaved(saved);
+      if (saved) sendCompletedBillAnalytics(historyRecord);
       setSettlements(calculatedSettlements);
       // The completed operation is already stored in History. Keep its summary
       // visible, but make the next Start action open a clean draft immediately.
@@ -2900,9 +2903,19 @@ const sanitizeSpeedInsight = (event) => ({
   route: window.location.pathname,
 });
 
+function ApplicationRoot() {
+  const consent = useAnalyticsConsent();
+  const isAdminRoute = window.location.pathname === '/admin';
+  return (
+    <>
+      <RootView />
+      {!isAdminRoute && consent === 'accepted' && (
+        <SpeedInsights route={window.location.pathname} beforeSend={sanitizeSpeedInsight} />
+      )}
+    </>
+  );
+}
+
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <RootView />
-    <SpeedInsights route={window.location.pathname} beforeSend={sanitizeSpeedInsight} />
-  </StrictMode>,
+  <StrictMode><ApplicationRoot /></StrictMode>,
 );

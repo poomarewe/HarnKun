@@ -29,6 +29,9 @@ export default function AdminPanel() {
   const [view, setView] = useState('loading');
   const [password, setPassword] = useState('');
   const [dashboard, setDashboard] = useState(null);
+  const [bills, setBills] = useState([]);
+  const [billCursor, setBillCursor] = useState(null);
+  const [billsLoading, setBillsLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(null);
@@ -55,9 +58,29 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const loadBills = useCallback(async (cursor = null, append = false) => {
+    setBillsLoading(true);
+    try {
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+      const data = await readJson(await fetch(`/api/admin-bills${query}`, {
+        credentials: 'same-origin', cache: 'no-store',
+      }));
+      setBills(current => append ? [...current, ...data.bills] : data.bills);
+      setBillCursor(data.nextCursor);
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setBillsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    if (view === 'dashboard') loadBills();
+  }, [view, loadBills]);
 
   useEffect(() => {
     if (view !== 'dashboard') return undefined;
@@ -66,7 +89,7 @@ export default function AdminPanel() {
   }, [loadDashboard, view]);
 
   const maxHistoryUsers = useMemo(
-    () => Math.max(1, ...(dashboard?.history || []).map((entry) => entry.users)),
+    () => Math.max(1, ...(dashboard?.history || []).map((entry) => entry.visitors)),
     [dashboard],
   );
 
@@ -160,7 +183,7 @@ export default function AdminPanel() {
           <h1>Usage dashboard</h1>
         </div>
         <div className="admin-actions">
-          <button className="admin-secondary-button" type="button" onClick={() => loadDashboard()}>
+          <button className="admin-secondary-button" type="button" onClick={() => { loadDashboard(); loadBills(); }}>
             Refresh
           </button>
           <button className="admin-secondary-button" type="button" disabled={submitting} onClick={handleLogout}>
@@ -178,14 +201,24 @@ export default function AdminPanel() {
           <small>Active in the last {dashboard.onlineWindowMinutes} minutes</small>
         </article>
         <article className="admin-metric">
-          <span>Users today</span>
-          <strong>{dashboard.usersToday.toLocaleString()}</strong>
-          <small>Unique browsers today</small>
+          <span>Visitors today</span>
+          <strong>{dashboard.visitorsToday.toLocaleString()}</strong>
+          <small>Consented browser IDs today</small>
         </article>
         <article className="admin-metric">
-          <span>All-time users</span>
-          <strong>{dashboard.totalUsers.toLocaleString()}</strong>
-          <small>Unique browsers recorded</small>
+          <span>Visit days</span>
+          <strong>{dashboard.visitDays.toLocaleString()}</strong>
+          <small>Daily browser counts summed; not lifetime unique people</small>
+        </article>
+        <article className="admin-metric">
+          <span>Completed bills</span>
+          <strong>{dashboard.completedBills.toLocaleString()}</strong>
+          <small>Consented saved bills</small>
+        </article>
+        <article className="admin-metric">
+          <span>Tracked spend</span>
+          <strong>฿{dashboard.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+          <small>Anonymous aggregate; retained after bill details expire</small>
         </article>
       </section>
 
@@ -193,17 +226,17 @@ export default function AdminPanel() {
         <div className="admin-section-heading">
           <div>
             <p className="admin-eyebrow">Last 30 days</p>
-            <h2 id="usage-history-title">Daily users</h2>
+            <h2 id="usage-history-title">Daily activity and bill totals</h2>
           </div>
           <span>Last activity: {formatTimestamp(dashboard.lastActivity)}</span>
         </div>
 
-        <div className="admin-chart" role="img" aria-label="Daily unique browser chart for the last 30 days">
+        <div className="admin-chart" role="img" aria-label="Daily visitors during the last 30 days">
           {history.map((entry) => (
-            <div className="admin-chart-column" key={entry.day} title={`${formatDate(entry.day)}: ${entry.users} users`}>
-              <strong>{entry.users || ''}</strong>
+            <div className="admin-chart-column" key={entry.day} title={`${formatDate(entry.day)}: ${entry.visitors} visitors, ${entry.bills} bills, ฿${entry.spend.toFixed(2)}`}>
+              <strong>{entry.visitors || ''}</strong>
               <div className="admin-chart-track">
-                <i style={{ height: `${Math.max(entry.users ? 8 : 2, (entry.users / maxHistoryUsers) * 100)}%` }} />
+                <i style={{ height: `${Math.max(entry.visitors ? 8 : 2, (entry.visitors / maxHistoryUsers) * 100)}%` }} />
               </div>
               <span>{formatDate(entry.day)}</span>
             </div>
@@ -212,12 +245,14 @@ export default function AdminPanel() {
 
         <div className="admin-history-table-wrap">
           <table>
-            <thead><tr><th>Date</th><th>Unique browsers</th></tr></thead>
+            <thead><tr><th>Date</th><th>Visitors</th><th>Bills</th><th>Spend</th></tr></thead>
             <tbody>
               {[...history].reverse().map((entry) => (
                 <tr key={entry.day}>
                   <td>{formatDate(entry.day)}</td>
-                  <td>{entry.users.toLocaleString()}</td>
+                  <td>{entry.visitors.toLocaleString()}</td>
+                  <td>{entry.bills.toLocaleString()}</td>
+                  <td>฿{entry.spend.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -225,8 +260,40 @@ export default function AdminPanel() {
         </div>
       </section>
 
+      <section className="admin-history-card admin-bills-card" aria-labelledby="recent-bills-title">
+        <div className="admin-section-heading">
+          <div>
+            <p className="admin-eyebrow">Details expire after 30 days</p>
+            <h2 id="recent-bills-title">Recent completed bills</h2>
+          </div>
+          <span>Names and individual shares are not collected</span>
+        </div>
+        {bills.length === 0 && !billsLoading ? <p>No consented bill details yet.</p> : (
+          <div className="admin-bill-list">
+            {bills.map(bill => (
+              <details className="admin-bill-row" key={`${bill.visitorId}-${bill.historyId}`}>
+                <summary>
+                  <span>{formatTimestamp(bill.updatedAt)}</span>
+                  <span>{bill.deviceType} · {bill.browser} · {bill.visitorId}</span>
+                  <span>{bill.participantCount} people</span>
+                  <strong>฿{bill.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                </summary>
+                <ul>
+                  {bill.items.map((item, index) => (
+                    <li key={`${item.name}-${index}`}><span>{item.name}</span><strong>฿{Number(item.amount).toFixed(2)}</strong></li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+          </div>
+        )}
+        {billCursor && <button className="admin-secondary-button" type="button" disabled={billsLoading} onClick={() => loadBills(billCursor, true)}>
+          {billsLoading ? 'Loading…' : 'Load more bills'}
+        </button>}
+      </section>
+
       <footer className="admin-footer">
-        <span>Counts are anonymous browser estimates.</span>
+        <span>Bill details are linked to a random browser ID for up to 30 days. Aggregates have no browser ID.</span>
         <span>{lastRefreshed ? `Updated ${lastRefreshed.toLocaleTimeString()}` : ''}</span>
       </footer>
     </main>
