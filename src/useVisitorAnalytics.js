@@ -1,13 +1,10 @@
 import { useEffect } from 'react';
-import { useAnalyticsConsent } from './analytics-consent.js';
 import { sendVisitorHeartbeat } from './visitor-analytics.js';
 
 const HEARTBEAT_INTERVAL_MS = 45_000;
 
 export default function useVisitorAnalytics() {
-  const consent = useAnalyticsConsent();
   useEffect(() => {
-    if (consent !== 'accepted') return undefined;
     let intervalId;
 
     const heartbeat = () => {
@@ -32,5 +29,5 @@ export default function useVisitorAnalytics() {
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [consent]);
+  }, []);
 }

@@ -17,7 +17,7 @@ before(async () => {
 });
 after(async () => { if (server) { const exited = once(server, 'exit'); server.kill(); await exited; } });
 test('built routes, manifest, icons and metadata are served', async () => {
-  for (const path of ['/', '/history', '/admin', '/manifest.webmanifest', '/icon.png', '/robots.txt', '/sitemap.xml']) {
+  for (const path of ['/', '/history', '/admin', '/visitor-heartbeat.js', '/manifest.webmanifest', '/icon.png', '/robots.txt', '/sitemap.xml']) {
     const response = await fetch(origin + path);
     assert.equal(response.status, 200, path); await response.arrayBuffer();
   }
@@ -38,14 +38,14 @@ test('real HTTP API method, malformed JSON, disabled services and unknown endpoi
     assert.equal(response.status, expected, path); await response.json();
   }
 });
-test('analytics endpoints honor consent and keep admin endpoints protected', async () => {
+test('analytics attempts visitor recording without consent and keeps admin endpoints protected', async () => {
   const response = await fetch(origin + '/api/analytics', { method: 'POST' });
-  assert.equal(response.status, 204);
+  assert.equal(response.status, 503);
   assert.equal(response.headers.get('set-cookie'), null);
   const bill = await fetch(origin + '/api/analytics-bills', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ historyId: 'test' }),
   });
-  assert.equal(bill.status, 403);
+  assert.equal(bill.status, 409);
   const bills = await fetch(origin + '/api/admin-bills');
   assert.equal(bills.status, 503);
   const cleanup = await fetch(origin + '/api/analytics-cleanup');

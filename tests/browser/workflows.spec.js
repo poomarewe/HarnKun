@@ -25,12 +25,9 @@ test.beforeEach(async ({ page }) => {
     return route.continue();
   });
 });
-async function home(page, { consent = 'reject' } = {}) {
+async function home(page) {
   await page.goto('/');
   await expect(page.getByRole('button', { name: /^Split a bill/ })).toBeVisible();
-  if (consent && await page.getByRole('button', { name: 'Reject analytics', exact: true }).count()) {
-    await page.getByRole('button', { name: 'Reject analytics', exact: true }).click();
-  }
 }
 async function people(page, names = ['A', 'B']) {
   await home(page);
@@ -88,51 +85,46 @@ async function noOverflow(page) {
   if (sizes.dialog) expect(sizes.dialog.scroll).toBeLessThanOrEqual(sizes.dialog.client + 1);
 }
 
-test('analytics stays off until accepted; accepting records only a saved bill summary', async ({ page }) => {
+test('cookie consent UI is absent and new visitors are tracked while splitting bills', async ({ page }) => {
   const analyticsRequests = [];
+  const billPayloads = [];
   page.on('request', request => {
     if (/\/api\/(analytics|analytics-bills)(\?|$)/.test(request.url())) analyticsRequests.push(request);
+    if (request.url().endsWith('/api/analytics-bills')) billPayloads.push(JSON.parse(request.postData()));
   });
-  await home(page, { consent: null });
-  await expect(page.getByRole('region', { name: 'Choose optional analytics' })).toBeVisible();
-  expect(analyticsRequests).toHaveLength(0);
-  await page.getByRole('button', { name: 'Accept analytics' }).click();
+  await home(page);
+  await expect(page.getByRole('region', { name: 'Choose optional analytics' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Cookie settings' })).toHaveCount(0);
   await bill(page);
   await addItem(page, 'Pad Thai', '120.50');
-  const billRequest = page.waitForRequest(request => request.url().endsWith('/api/analytics-bills'));
   await finish(page);
-  const sent = JSON.parse((await billRequest).postData());
-  expect(Object.keys(sent).sort()).toEqual(['historyId', 'items', 'participantCount', 'total']);
-  expect(sent).toMatchObject({ participantCount: 2, total: 120.5, items: [{ name: 'Pad Thai', amount: 120.5 }] });
-  expect(sent.historyId).toBeTruthy();
-  expect(JSON.stringify(sent)).not.toMatch(/Alice|Bob|friends|allocations|device|user.?agent/i);
-  await expect(page.getByRole('button', { name: 'Cookie settings' })).toBeVisible();
+  await expect(page.getByText('Each person owes', { exact: true })).toBeVisible();
+  await expect.poll(() => analyticsRequests.length).toBeGreaterThan(0);
+  await expect.poll(() => billPayloads.length).toBeGreaterThan(0);
+  expect(billPayloads[0].participants).toEqual([{ name: 'A', share: 60.25 }, { name: 'B', share: 60.25 }]);
 });
 
-test('rejecting analytics keeps local bill splitting and history working without tracking', async ({ page }) => {
+test('local bill splitting and history work without cookie consent UI', async ({ page }) => {
   const tracked = [];
   page.on('request', request => {
     if (/\/api\/(analytics|analytics-bills)(\?|$)/.test(request.url())) tracked.push(request.url());
   });
-  await home(page, { consent: null });
-  await page.getByRole('button', { name: 'Reject analytics' }).click();
+  await home(page);
   await bill(page);
   await addItem(page, 'Noodles', '80');
   await finish(page);
   await expect(page.getByText('Each person owes', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.locator('.home-history-card')).toHaveCount(1);
-  expect(tracked).toEqual([]);
-  await page.getByRole('button', { name: 'Cookie settings' }).click();
-  await expect(page.getByRole('button', { name: 'Accept analytics' })).toBeVisible();
+  expect(tracked.length).toBeGreaterThan(0);
 });
 
-test('accepting analytics never backfills bills already in local history', async ({ page }) => {
+test('returning history is not backfilled after automatic tracking starts', async ({ page }) => {
   const billRequests = [];
   page.on('request', request => {
     if (request.url().endsWith('/api/analytics-bills')) billRequests.push(request);
   });
-  await home(page, { consent: null });
+  await home(page);
   await page.evaluate(async existingRecord => {
     const db = await new Promise((resolve, reject) => {
       const req = indexedDB.open('harn-kun-history', 1);
@@ -148,19 +140,17 @@ test('accepting analytics never backfills bills already in local history', async
   }, record);
   await page.reload();
   await expect(page.locator('.home-history-card')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Accept analytics' }).click();
   await page.waitForTimeout(250);
   expect(billRequests).toHaveLength(0);
   await expect(page.locator('.home-history-card')).toHaveCount(1);
 });
 
-test('Thai static page shows Thai consent and waits for acceptance before visit tracking', async ({ page }) => {
+test('Thai static page has no cookie consent UI and tracks visits', async ({ page }) => {
   const tracked = [];
   page.on('request', request => { if (request.url().endsWith('/api/analytics')) tracked.push(request.url()); });
   await page.goto('/th/');
-  await expect(page.getByRole('region', { name: 'คุณเลือกการวิเคราะห์ข้อมูลได้' })).toBeVisible();
-  expect(tracked).toEqual([]);
-  await page.getByRole('button', { name: 'ยอมรับการวิเคราะห์' }).click();
+  await expect(page.getByRole('region', { name: 'คุณเลือกการวิเคราะห์ข้อมูลได้' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'ตั้งค่าคุกกี้' })).toHaveCount(0);
   await expect.poll(() => tracked.length).toBeGreaterThan(0);
 });
 
@@ -362,14 +352,14 @@ test('storage disabled does not crash home and browsers are isolated', async ({ 
 });
 test('mock admin login, dashboard, refresh, session expiry and logout', async ({ page }) => {
   let signedIn = false, calls = 0;
-  await page.route('**/api/admin-dashboard', route => { calls++; return route.fulfill({ status: signedIn ? 200 : 401, json: signedIn ? { onlineNow: 2, visitorsToday: 3, visitDays: 4, completedBills: 5, totalSpend: 100, onlineWindowMinutes: 2, history: [{ day: '2026-10-25', visitors: 3, bills: 2, spend: 100 }] } : { message: 'Authentication required.' } }); });
+  await page.route('**/api/admin-dashboard', route => { calls++; return route.fulfill({ status: signedIn ? 200 : 401, json: signedIn ? { onlineNow: 2, visitorsToday: 3, visitDays: 4, completedBills: 5, onlineWindowMinutes: 2, history: [{ day: '2026-10-25', visitors: 3, bills: 2 }] } : { message: 'Authentication required.' } }); });
   await page.route('**/api/admin-login', route => { signedIn = true; return route.fulfill({ json: { authenticated: true } }); });
   await page.route('**/api/admin-logout', route => { signedIn = false; return route.fulfill({ json: {} }); });
   await page.route('**/api/admin-bills**', route => {
     const cursor = new URL(route.request().url()).searchParams.get('cursor');
     return route.fulfill({ json: cursor
-      ? { bills: [{ historyId: 'local-2', updatedAt: '2026-10-24T01:00:00.000Z', total: 44, participantCount: 2, items: [{ name: 'Iced tea', amount: 44 }], deviceType: 'desktop', browser: 'Chrome', visitorId: 'Browser zyx98765' }], nextCursor: null }
-      : { bills: [{ historyId: 'local-1', updatedAt: '2026-10-25T01:00:00.000Z', total: 120.5, participantCount: 3, items: [{ name: 'Pad Thai', amount: 120.5 }], deviceType: 'mobile', browser: 'Safari', visitorId: 'Browser abc12345' }], nextCursor: 'next-page' } });
+      ? { bills: [{ historyId: 'local-2', updatedAt: '2026-10-24T01:00:00.000Z', total: 44, participantCount: 2, participants: [{ name: 'Mali', share: 22 }, { name: 'Noi', share: 22 }], items: [{ name: 'Iced tea', amount: 44 }], deviceType: 'desktop', browser: 'Chrome', visitorId: 'Browser zyx98765' }], nextCursor: null }
+      : { bills: [{ historyId: 'local-1', updatedAt: '2026-10-25T01:00:00.000Z', total: 120.5, participantCount: 3, participants: [{ name: 'Alice', share: 60.25 }, { name: 'Bob', share: 60.25 }], items: [{ name: 'Pad Thai', amount: 120.5 }], deviceType: 'mobile', browser: 'Safari', visitorId: 'Browser abc12345' }], nextCursor: 'next-page' } });
   });
   await page.goto('/admin');
   await page.getByLabel('Admin password').fill('dummy');
@@ -378,6 +368,9 @@ test('mock admin login, dashboard, refresh, session expiry and logout', async ({
   const savedBill = page.locator('.admin-bill-row');
   await expect(savedBill).toContainText('Pad Thai');
   await expect(savedBill).toContainText('mobile · Safari');
+  await expect(savedBill).toContainText('Alice');
+  await expect(savedBill).not.toContainText('Tracked spend');
+  await expect(page.getByRole('columnheader', { name: 'Spend' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Load more bills' }).click();
   await expect(page.locator('.admin-bill-row')).toHaveCount(2);
   await expect(page.locator('.admin-bill-row').nth(1)).toContainText('Iced tea');
@@ -489,7 +482,7 @@ test('modal traps keyboard focus, closes on Escape; axe detects no serious/criti
   await expect(page.getByRole('dialog', { name: 'Bill step' })).toHaveCount(0);
 });
 test('admin failed logout stays visible and reports active session', async ({ page }) => {
-  await page.route('**/api/admin-dashboard', route => route.fulfill({ json: { onlineNow: 0, visitorsToday: 0, visitDays: 0, completedBills: 0, totalSpend: 0, onlineWindowMinutes: 2, history: [] } }));
+  await page.route('**/api/admin-dashboard', route => route.fulfill({ json: { onlineNow: 0, visitorsToday: 0, visitDays: 0, completedBills: 0, onlineWindowMinutes: 2, history: [] } }));
   await page.route('**/api/admin-logout', route => route.abort());
   await page.goto('/admin');
   await page.getByRole('button', { name: 'Log out', exact: true }).click();

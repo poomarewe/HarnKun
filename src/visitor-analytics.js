@@ -1,9 +1,6 @@
-import { readAnalyticsConsent } from './analytics-consent.js';
-
 let heartbeatInFlight;
 
 export function sendVisitorHeartbeat() {
-  if (readAnalyticsConsent() !== 'accepted') return Promise.resolve(false);
   if (!heartbeatInFlight) {
     heartbeatInFlight = fetch('/api/analytics', {
       method: 'POST', credentials: 'same-origin', keepalive: true,
@@ -14,9 +11,8 @@ export function sendVisitorHeartbeat() {
 }
 
 export async function sendCompletedBillAnalytics(record) {
-  if (readAnalyticsConsent() !== 'accepted') return false;
   const ready = await sendVisitorHeartbeat();
-  if (!ready || readAnalyticsConsent() !== 'accepted') return false;
+  if (!ready) return false;
 
   try {
     const response = await fetch('/api/analytics-bills', {
@@ -28,6 +24,7 @@ export async function sendCompletedBillAnalytics(record) {
         historyId: record.id,
         total: record.total,
         participantCount: record.friends.length,
+        participants: record.settlements.map(person => ({ name: person.name, share: person.amount })),
         items: record.billItems.map(item => ({ name: item.name, amount: item.amount })),
       }),
     });

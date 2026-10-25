@@ -203,7 +203,7 @@ export default function AdminPanel() {
         <article className="admin-metric">
           <span>Visitors today</span>
           <strong>{dashboard.visitorsToday.toLocaleString()}</strong>
-          <small>Consented browser IDs today</small>
+          <small>Random browser IDs seen today</small>
         </article>
         <article className="admin-metric">
           <span>Visit days</span>
@@ -213,12 +213,7 @@ export default function AdminPanel() {
         <article className="admin-metric">
           <span>Completed bills</span>
           <strong>{dashboard.completedBills.toLocaleString()}</strong>
-          <small>Consented saved bills</small>
-        </article>
-        <article className="admin-metric">
-          <span>Tracked spend</span>
-          <strong>฿{dashboard.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-          <small>Anonymous aggregate; retained after bill details expire</small>
+          <small>Saved bill records</small>
         </article>
       </section>
 
@@ -226,14 +221,14 @@ export default function AdminPanel() {
         <div className="admin-section-heading">
           <div>
             <p className="admin-eyebrow">Last 30 days</p>
-            <h2 id="usage-history-title">Daily activity and bill totals</h2>
+            <h2 id="usage-history-title">Daily visitor and bill counts</h2>
           </div>
           <span>Last activity: {formatTimestamp(dashboard.lastActivity)}</span>
         </div>
 
         <div className="admin-chart" role="img" aria-label="Daily visitors during the last 30 days">
           {history.map((entry) => (
-            <div className="admin-chart-column" key={entry.day} title={`${formatDate(entry.day)}: ${entry.visitors} visitors, ${entry.bills} bills, ฿${entry.spend.toFixed(2)}`}>
+            <div className="admin-chart-column" key={entry.day} title={`${formatDate(entry.day)}: ${entry.visitors} visitors, ${entry.bills} bills`}>
               <strong>{entry.visitors || ''}</strong>
               <div className="admin-chart-track">
                 <i style={{ height: `${Math.max(entry.visitors ? 8 : 2, (entry.visitors / maxHistoryUsers) * 100)}%` }} />
@@ -245,14 +240,13 @@ export default function AdminPanel() {
 
         <div className="admin-history-table-wrap">
           <table>
-            <thead><tr><th>Date</th><th>Visitors</th><th>Bills</th><th>Spend</th></tr></thead>
+            <thead><tr><th>Date</th><th>Visitors</th><th>Bills</th></tr></thead>
             <tbody>
               {[...history].reverse().map((entry) => (
                 <tr key={entry.day}>
                   <td>{formatDate(entry.day)}</td>
                   <td>{entry.visitors.toLocaleString()}</td>
                   <td>{entry.bills.toLocaleString()}</td>
-                  <td>฿{entry.spend.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -266,9 +260,9 @@ export default function AdminPanel() {
             <p className="admin-eyebrow">Details expire after 30 days</p>
             <h2 id="recent-bills-title">Recent completed bills</h2>
           </div>
-          <span>Names and individual shares are not collected</span>
+          <span>Participant names and individual shares are included</span>
         </div>
-        {bills.length === 0 && !billsLoading ? <p>No consented bill details yet.</p> : (
+        {bills.length === 0 && !billsLoading ? <p>No bill details yet.</p> : (
           <div className="admin-bill-list">
             {bills.map(bill => (
               <details className="admin-bill-row" key={`${bill.visitorId}-${bill.historyId}`}>
@@ -281,6 +275,11 @@ export default function AdminPanel() {
                 <ul>
                   {bill.items.map((item, index) => (
                     <li key={`${item.name}-${index}`}><span>{item.name}</span><strong>฿{Number(item.amount).toFixed(2)}</strong></li>
+                  ))}
+                </ul>
+                <ul className="admin-bill-participants" aria-label="Participant shares">
+                  {bill.participants.map((person, index) => (
+                    <li key={`${person.name}-${index}`}><span>{person.name}</span><strong>฿{Number(person.share).toFixed(2)}</strong></li>
                   ))}
                 </ul>
               </details>

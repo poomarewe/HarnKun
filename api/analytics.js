@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { AnalyticsSetupError, parseDeviceDetails, recordVisitorHeartbeat } from '../lib/analytics-db.js';
 import {
   clearVisitorCookies,
-  hasAnalyticsConsent,
   readVisitorId,
   visitorCookie,
 } from '../lib/visitor-cookie.js';
@@ -21,8 +20,6 @@ export default {
     if (request.method !== 'POST') {
       return json({ message: 'Method not allowed.' }, 405, { Allow: 'POST' });
     }
-    if (!hasAnalyticsConsent(request)) return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
-
     const existingVisitorId = readVisitorId(request);
     const visitorId = existingVisitorId || randomUUID();
     try {

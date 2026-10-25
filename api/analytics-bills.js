@@ -2,7 +2,7 @@ import {
   AnalyticsSetupError,
   recordCompletedBill,
 } from '../lib/analytics-db.js';
-import { hasAnalyticsConsent, readVisitorId } from '../lib/visitor-cookie.js';
+import { readVisitorId } from '../lib/visitor-cookie.js';
 
 function json(data, status = 200, headers = {}) {
   return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
@@ -14,6 +14,10 @@ export function sanitizeAnalyticsBill(value) {
     || !Number.isFinite(value.total) || value.total < 0 || value.total > 2_000_000_000_000
     || !Number.isSafeInteger(Math.round(value.total * 100))
     || !Number.isInteger(value.participantCount) || value.participantCount < 2 || value.participantCount > 100
+    || !Array.isArray(value.participants) || value.participants.length !== value.participantCount
+    || value.participants.some(person => !person || typeof person.name !== 'string' || !person.name.trim()
+      || person.name.length > 80 || !Number.isFinite(person.share) || person.share < 0
+      || person.share > 1_000_000_000 || !Number.isSafeInteger(Math.round(person.share * 100)))
     || !Array.isArray(value.items) || value.items.length < 1 || value.items.length > 1000
     || value.items.some(item => !item || typeof item.name !== 'string' || !item.name.trim()
       || item.name.length > 200 || !Number.isFinite(item.amount) || item.amount < 0
@@ -22,6 +26,7 @@ export function sanitizeAnalyticsBill(value) {
     historyId: value.historyId.trim(),
     totalSatang: Math.round(value.total * 100),
     participantCount: value.participantCount,
+    participants: value.participants.map(person => ({ name: person.name.trim(), share: Math.round(person.share * 100) / 100 })),
     items: value.items.map(item => ({ name: item.name.trim(), amount: Math.round(item.amount * 100) / 100 })),
   };
 }
@@ -29,9 +34,8 @@ export function sanitizeAnalyticsBill(value) {
 export default {
   async fetch(request) {
     if (request.method !== 'POST') return json({ message: 'Method not allowed.' }, 405, { Allow: 'POST' });
-    if (!hasAnalyticsConsent(request)) return json({ message: 'Analytics consent is required.' }, 403);
     const visitorId = readVisitorId(request);
-    if (!visitorId) return json({ message: 'The consented visit could not be identified. Please try again.' }, 409);
+    if (!visitorId) return json({ message: 'The visit could not be identified. Please try again.' }, 409);
 
     let value;
     try { value = await request.json(); } catch { return json({ message: 'A valid bill summary is required.' }, 400); }

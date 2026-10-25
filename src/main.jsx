@@ -11,7 +11,6 @@ import GuidedWorkflowView from './GuidedWorkflowView';
 import DoodleField, { Doodle } from './DecorativeDoodles';
 import AdminPanel from './AdminPanel';
 import useVisitorAnalytics from './useVisitorAnalytics';
-import { useAnalyticsConsent } from './analytics-consent.js';
 import { sendCompletedBillAnalytics } from './visitor-analytics.js';
 import useDialogKeyboard from './useDialogKeyboard';
 import { getBillTotals, isValidMoney, itemShare, MAX_BAHT, toSatang } from './money.js';
@@ -2904,12 +2903,11 @@ const sanitizeSpeedInsight = (event) => ({
 });
 
 function ApplicationRoot() {
-  const consent = useAnalyticsConsent();
   const isAdminRoute = window.location.pathname === '/admin';
   return (
     <>
       <RootView />
-      {!isAdminRoute && consent === 'accepted' && (
+      {!isAdminRoute && (
         <SpeedInsights route={window.location.pathname} beforeSend={sanitizeSpeedInsight} />
       )}
     </>
