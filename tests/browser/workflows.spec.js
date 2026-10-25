@@ -137,7 +137,7 @@ test('100 person limit via UI', async ({ page }) => {
   await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Continue to bill' })).toBeEnabled();
 });
-test('empty bill name and draft close/resume; refresh starts clean draft', async ({ page }) => {
+test('unfinished draft resumes after closing and refreshing', async ({ page }) => {
   await people(page);
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByLabel('Bill name', { exact: true }).fill('  ');
@@ -147,7 +147,23 @@ test('empty bill name and draft close/resume; refresh starts clean draft', async
   await page.getByRole('button', { name: /^Continue your bill/ }).click();
   await expect(page.getByLabel('Bill name', { exact: true })).toHaveValue('Draft name');
   await page.reload();
-  await expect(page.getByRole('button', { name: /^Split a bill/ })).toBeVisible();
+  await page.getByRole('button', { name: /^Continue your bill/ }).click();
+  await expect(page.getByLabel('Bill name', { exact: true })).toHaveValue('Draft name');
+});
+test('F5 restores a split in progress and its selected people', async ({ page }) => {
+  await bill(page, ['A', 'B', 'C']);
+  await addItem(page, 'Noodles', '100');
+  await page.getByRole('button', { name: 'Continue to sharing' }).click();
+  await page.getByRole('button', { name: /^A/ }).click();
+  await expect(page.getByRole('button', { name: /^A/ })).toHaveAttribute('aria-pressed', 'true');
+
+  await page.reload();
+  await page.getByRole('button', { name: /^Continue your bill/ }).click();
+  await expect(page.getByText('Who had this?', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^A/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'B', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'See the split' }).click();
+  await expect(page.getByText('Each person owes', { exact: true })).toBeVisible();
 });
 test('manual zero, duplicate, quantity, edit, delete and VAT/discount workflow', async ({ page }) => {
   await bill(page);

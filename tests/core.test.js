@@ -7,6 +7,7 @@ import operations from '../api/operations.js';
 import logout from '../api/admin-logout.js';
 import { getBillTotals, isValidMoney, itemShare, toSatang } from '../src/money.js';
 import { isHistoryRecord } from '../src/history-store.js';
+import { BILL_DRAFT_STORAGE_KEY, clearBillDraft, readBillDraft, saveBillDraft } from '../src/draft-store.js';
 
 process.env.ADMIN_PASSWORD = 'test-password-only';
 process.env.ADMIN_SESSION_SECRET = 'synthetic-secret-for-local-tests-only-12345';
@@ -20,6 +21,21 @@ test('unequal item subsets + VAT/discount and reserved object-key names', () => 
   const result = settlementsFor({ friends: ['__proto__', 'constructor', 'C'], billItems: [{ amount: 100 }, { amount: 20 }], allocations: [['__proto__', 'constructor'], ['C']], total: 118.4 });
   assert.equal(result.reduce((s, x) => s + Math.round(x.amount * 100), 0), 11840);
   assert.ok(result.every(x => Number.isFinite(x.amount) && x.amount >= 0));
+});
+test('complex shared items settle accurately after VAT and discount rounding', () => {
+  const friends = ['Ana', 'Bo', 'Chai', 'Dee'];
+  const billItems = [{ amount: 101 }, { amount: 25.05 }, { amount: 15 }];
+  const allocations = [['Ana', 'Bo', 'Chai'], ['Bo', 'Dee'], ['Dee']];
+  const totals = getBillTotals(billItems, true, 7, true, 10);
+  assert.deepEqual(totals, { subtotal: 141.05, vatAmount: 9.87, appliedDiscount: 10, total: 140.92 });
+  const settlements = settlementsFor({ friends, billItems, allocations, total: totals.total });
+  assert.deepEqual(settlements, [
+    { name: 'Ana', amount: 33.64 },
+    { name: 'Bo', amount: 46.16 },
+    { name: 'Chai', amount: 33.63 },
+    { name: 'Dee', amount: 27.49 },
+  ]);
+  assert.equal(settlements.reduce((sum, entry) => sum + Math.round(entry.amount * 100), 0), 14092);
 });
 test('zero bill and full discount produce zero settlements', () => {
   for (const amount of [0, 100]) {
@@ -110,6 +126,30 @@ test('malformed history rows are rejected without altering their source', () => 
   const row = { id: 'bad', updatedAt: 1 };
   assert.equal(isHistoryRecord(row), false);
   assert.deepEqual(row, { id: 'bad', updatedAt: 1 });
+});
+test('unfinished bill drafts round-trip locally and malformed drafts fail safely', () => {
+  const values = new Map();
+  const storage = {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: key => values.delete(key),
+  };
+  const draft = {
+    eventName: 'Late dinner', friends: ['A', 'B'], friendName: '',
+    billItems: [{ name: 'Noodles', quantity: 1, amount: 100 }], allocations: [['A']],
+    step: 'split', splitIndex: 0, settlements: [], vatEnabled: true, vatRate: 7,
+    discountEnabled: false, discountAmount: 0, peopleNameConfirmed: true,
+    manualComposerOpen: false, manualItemName: '', manualItemPrice: '', manualQuantity: '1',
+    showManualQuantity: false, showBillExtras: true, activeHistoryId: null, activeHistoryUpdatedAt: null,
+  };
+  assert.equal(saveBillDraft(draft, storage), true);
+  assert.equal(readBillDraft(storage).eventName, 'Late dinner');
+  assert.deepEqual(readBillDraft(storage).allocations, [['A']]);
+  assert.equal(readBillDraft(storage).step, 'split');
+  storage.setItem(BILL_DRAFT_STORAGE_KEY, '{broken');
+  assert.equal(readBillDraft(storage), null);
+  assert.equal(clearBillDraft(storage), true);
+  assert.equal(readBillDraft(storage), null);
 });
 test('operations accepts legacy valid payload without logging its contents', async () => {
   let logs = 0; const original = console.log;

@@ -28,7 +28,6 @@ test('real HTTP API method, malformed JSON, disabled services and unknown endpoi
     ['/api/scan-bill', { method: 'POST', body: new FormData() }, 503],
     ['/api/operations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' }, 400],
     ['/api/operations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'null' }, 400],
-    ['/api/analytics', { method: 'POST' }, 503],
     ['/api/admin-dashboard', {}, 503],
     ['/api/admin-login', { method: 'POST', headers: { Origin: 'https://bad.invalid' } }, 403],
     ['/api/admin-logout', { method: 'POST' }, 200],
@@ -38,6 +37,13 @@ test('real HTTP API method, malformed JSON, disabled services and unknown endpoi
     const response = await fetch(origin + path, options);
     assert.equal(response.status, expected, path); await response.json();
   }
+});
+test('analytics setup failures do not disclose internal configuration details', async () => {
+  const response = await fetch(origin + '/api/analytics', { method: 'POST' });
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.deepEqual(body, { message: 'Analytics is temporarily unavailable.' });
+  assert.doesNotMatch(JSON.stringify(body), /DATABASE_URL|database is not configured/i);
 });
 test('private environment values are absent from browser bundles (values never printed)', () => {
   let variables = {};

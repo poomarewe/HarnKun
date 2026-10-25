@@ -22,11 +22,8 @@ export default {
       const headers = existingVisitorId ? {} : { 'Set-Cookie': visitorCookie(request, visitorId) };
       return json({ recorded: true }, 200, headers);
     } catch (error) {
-      const message = error instanceof AnalyticsSetupError
-        ? error.message
-        : 'Analytics is temporarily unavailable.';
       if (!(error instanceof AnalyticsSetupError)) console.error('Analytics heartbeat failed.');
-      return json({ message }, 503);
+      return json({ message: 'Analytics is temporarily unavailable.' }, 503);
     }
   },
 };

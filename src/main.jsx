@@ -14,6 +14,7 @@ import useVisitorAnalytics from './useVisitorAnalytics';
 import useDialogKeyboard from './useDialogKeyboard';
 import { getBillTotals, isValidMoney, itemShare, MAX_BAHT, toSatang } from './money.js';
 import { saveHistoryRecord, readHistoryRecords, clearHistoryRecords, deleteHistoryRecord, subscribeHistoryChanges } from './history-store.js';
+import { clearBillDraft, readBillDraft, saveBillDraft } from './draft-store.js';
 import './critical.css';
 import './clay-home.css';
 import './maggie-home.css';
@@ -645,6 +646,7 @@ function App() {
   useVisitorAnalytics();
   useDialogKeyboard();
   const isSharedHistoryRoute = window.location.pathname === '/history';
+  const [initialDraft] = useState(() => (isSharedHistoryRoute ? null : readBillDraft()));
   const [showIntro, setShowIntro] = useState(() => {
     if (typeof window === 'undefined' || isSharedHistoryRoute) return false;
     return true;
@@ -652,7 +654,7 @@ function App() {
   const theme = 'finance';
   const [isCreating, setIsCreating] = useState(false);
   const [isWorkflowClosing, setIsWorkflowClosing] = useState(false);
-  const [hasActiveDraft, setHasActiveDraft] = useState(false);
+  const [hasActiveDraft, setHasActiveDraft] = useState(Boolean(initialDraft));
   const [historyView, setHistoryView] = useState(null);
   const [historyRecords, setHistoryRecords] = useState([]);
   const [selectedHistory, setSelectedHistory] = useState(null);
@@ -668,20 +670,20 @@ function App() {
   const [homeHistorySwipe, setHomeHistorySwipe] = useState({ id: null, offset: 0, holding: false });
   const [removingHistoryId, setRemovingHistoryId] = useState(null);
   const [historyDeleteInputLocked, setHistoryDeleteInputLocked] = useState(false);
-  const [activeHistoryId, setActiveHistoryId] = useState(null);
-  const [activeHistoryUpdatedAt, setActiveHistoryUpdatedAt] = useState(null);
-  const [step, setStep] = useState('friends');
-  const [peopleNameConfirmed, setPeopleNameConfirmed] = useState(false);
-  const [manualComposerOpen, setManualComposerOpen] = useState(false);
-  const [manualItemName, setManualItemName] = useState('');
-  const [manualItemPrice, setManualItemPrice] = useState('');
-  const [manualQuantity, setManualQuantity] = useState('1');
-  const [showManualQuantity, setShowManualQuantity] = useState(false);
-  const [showBillExtras, setShowBillExtras] = useState(false);
+  const [activeHistoryId, setActiveHistoryId] = useState(() => initialDraft?.activeHistoryId ?? null);
+  const [activeHistoryUpdatedAt, setActiveHistoryUpdatedAt] = useState(() => initialDraft?.activeHistoryUpdatedAt ?? null);
+  const [step, setStep] = useState(() => initialDraft?.step ?? 'friends');
+  const [peopleNameConfirmed, setPeopleNameConfirmed] = useState(() => initialDraft?.peopleNameConfirmed ?? false);
+  const [manualComposerOpen, setManualComposerOpen] = useState(() => initialDraft?.manualComposerOpen ?? false);
+  const [manualItemName, setManualItemName] = useState(() => initialDraft?.manualItemName ?? '');
+  const [manualItemPrice, setManualItemPrice] = useState(() => initialDraft?.manualItemPrice ?? '');
+  const [manualQuantity, setManualQuantity] = useState(() => initialDraft?.manualQuantity ?? '1');
+  const [showManualQuantity, setShowManualQuantity] = useState(() => initialDraft?.showManualQuantity ?? false);
+  const [showBillExtras, setShowBillExtras] = useState(() => initialDraft?.showBillExtras ?? false);
   const [workflowDirection, setWorkflowDirection] = useState('forward');
-  const [eventName, setEventName] = useState('');
-  const [friendName, setFriendName] = useState('');
-  const [friends, setFriends] = useState([]);
+  const [eventName, setEventName] = useState(() => initialDraft?.eventName ?? '');
+  const [friendName, setFriendName] = useState(() => initialDraft?.friendName ?? '');
+  const [friends, setFriends] = useState(() => initialDraft?.friends ?? []);
   const [billImageUrl, setBillImageUrl] = useState('');
   const [billPhotoOpen, setBillPhotoOpen] = useState(false);
   const [cameraFlow, setCameraFlow] = useState(null);
@@ -690,21 +692,21 @@ function App() {
   const [cropTransform, setCropTransform] = useState({ x: 0, y: 0, zoom: 1, rotation: 0 });
   const [cropAspect, setCropAspect] = useState('16:9');
   const [isCropping, setIsCropping] = useState(false);
-  const [billItems, setBillItems] = useState([]);
-  const [vatEnabled, setVatEnabled] = useState(false);
-  const [vatRate, setVatRate] = useState(7);
-  const [discountEnabled, setDiscountEnabled] = useState(false);
-  const [discountAmount, setDiscountAmount] = useState(0);
+  const [billItems, setBillItems] = useState(() => initialDraft?.billItems ?? []);
+  const [vatEnabled, setVatEnabled] = useState(() => initialDraft?.vatEnabled ?? false);
+  const [vatRate, setVatRate] = useState(() => initialDraft?.vatRate ?? 7);
+  const [discountEnabled, setDiscountEnabled] = useState(() => initialDraft?.discountEnabled ?? false);
+  const [discountAmount, setDiscountAmount] = useState(() => initialDraft?.discountAmount ?? 0);
   const [editingBillIndex, setEditingBillIndex] = useState(null);
-  const [ocrStatus, setOcrStatus] = useState('idle');
+  const [ocrStatus, setOcrStatus] = useState(() => (initialDraft?.billItems.length ? 'review' : 'idle'));
   const [ocrProgress, setOcrProgress] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [rawOcrText, setRawOcrText] = useState('');
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [allocations, setAllocations] = useState([]);
-  const [splitIndex, setSplitIndex] = useState(0);
-  const [settlements, setSettlements] = useState([]);
+  const [allocations, setAllocations] = useState(() => initialDraft?.allocations ?? []);
+  const [splitIndex, setSplitIndex] = useState(() => initialDraft?.splitIndex ?? 0);
+  const [settlements, setSettlements] = useState(() => initialDraft?.settlements ?? []);
   const inputRef = useRef(null);
   const manualNameRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -722,8 +724,62 @@ function App() {
   const billEditorRef = useRef(null);
   const workflowCloseTimerRef = useRef(null);
   const scanInFlightRef = useRef(false);
+  const draftSnapshotRef = useRef(null);
   const pageInteractionBlockersRef = useRef(null);
   pageInteractionBlockersRef.current = { isCreating, billPhotoOpen, clearHistoryConfirmOpen, historyView };
+
+  draftSnapshotRef.current = {
+    hasActiveDraft,
+    eventName,
+    friendName,
+    friends,
+    billItems,
+    allocations,
+    vatEnabled,
+    vatRate,
+    discountEnabled,
+    discountAmount,
+    step,
+    splitIndex,
+    settlements,
+    peopleNameConfirmed,
+    manualComposerOpen,
+    manualItemName,
+    manualItemPrice,
+    manualQuantity,
+    showManualQuantity,
+    showBillExtras,
+    activeHistoryId,
+    activeHistoryUpdatedAt,
+  };
+
+  useEffect(() => {
+    if (isSharedHistoryRoute) return undefined;
+    if (!hasActiveDraft) {
+      clearBillDraft();
+      return undefined;
+    }
+    const timer = window.setTimeout(() => saveBillDraft(draftSnapshotRef.current), 180);
+    return () => window.clearTimeout(timer);
+  }, [isSharedHistoryRoute, hasActiveDraft, eventName, friendName, friends, billItems, allocations,
+    vatEnabled, vatRate, discountEnabled, discountAmount, step, splitIndex, settlements,
+    peopleNameConfirmed, manualComposerOpen, manualItemName, manualItemPrice, manualQuantity,
+    showManualQuantity, showBillExtras, activeHistoryId, activeHistoryUpdatedAt]);
+
+  useEffect(() => {
+    if (isSharedHistoryRoute) return undefined;
+    const persistDraft = () => {
+      const latest = draftSnapshotRef.current;
+      if (latest?.hasActiveDraft) saveBillDraft(latest);
+      else clearBillDraft();
+    };
+    window.addEventListener('pagehide', persistDraft);
+    window.addEventListener('beforeunload', persistDraft);
+    return () => {
+      window.removeEventListener('pagehide', persistDraft);
+      window.removeEventListener('beforeunload', persistDraft);
+    };
+  }, [isSharedHistoryRoute]);
 
   useEffect(() => {
     if (!showIntro) return undefined;
@@ -1228,14 +1284,27 @@ function App() {
     setHistoryView(null);
     setSelectedHistory(null);
 
-    // A draft already loaded the workflow styles. Reopen it immediately and
-    // preserve its current step, inputs, scan review, and history metadata.
+    // A restored draft may be coming from a fresh page load, so ensure the
+    // workflow styles are ready before reopening its saved step.
     if (hasActiveDraft) {
+      try {
+        await loadAppStyles();
+      } catch {
+        setHistoryDetailError('Your bill draft is safe, but its form could not load. Tap Continue your bill to retry.');
+        return;
+      }
+      setHistoryDetailError('');
       setIsCreating(true);
       return;
     }
 
-    await loadAppStyles();
+    try {
+      await loadAppStyles();
+    } catch {
+      setHistoryDetailError('The bill form could not load. Tap Split a bill to retry.');
+      return;
+    }
+    setHistoryDetailError('');
     setActiveHistoryId(null);
     setActiveHistoryUpdatedAt(null);
     setHistorySaved(false);
