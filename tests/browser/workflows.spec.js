@@ -145,13 +145,13 @@ test('returning history is not backfilled after automatic tracking starts', asyn
   await expect(page.locator('.home-history-card')).toHaveCount(1);
 });
 
-test('Thai static page has no cookie consent UI and tracks visits', async ({ page }) => {
-  const tracked = [];
-  page.on('request', request => { if (request.url().endsWith('/api/analytics')) tracked.push(request.url()); });
-  await page.goto('/th/');
-  await expect(page.getByRole('region', { name: 'คุณเลือกการวิเคราะห์ข้อมูลได้' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'ตั้งค่าคุกกี้' })).toHaveCount(0);
-  await expect.poll(() => tracked.length).toBeGreaterThan(0);
+test.describe('Thai device', () => {
+  test.use({ locale: 'th-TH' });
+  test('home screen is in Thai when the device language is Thai', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'th');
+    await expect(page.locator('.home-create-button')).toContainText('แบ่งบิล');
+  });
 });
 
 for (const width of [320, 375, 390, 768, 1440]) {
