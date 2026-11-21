@@ -1595,3 +1595,8 @@ html[data-theme] body .operation-panel.guided-flow .guided-body > *:nth-child(n+
 @media (prefers-reduced-motion: reduce) {
   html[data-theme] body .operation-panel.guided-flow .guided-body > * { animation: none; }
 }
+
+/* Done button tick on the result step: white. */
+html[data-theme] body .operation-panel.guided-flow.step-result .guided-action span[aria-hidden="true"] {
+  color: #fff;
+}

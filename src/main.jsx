@@ -2786,6 +2786,7 @@ function App() {
               <span>Good times, shared fairly.</span>
             </div>
           </div>
+          <a className="home-history-footer-instagram" href="https://www.instagram.com/saaninchak/" target="_blank" rel="noopener noreferrer">@saaninchak</a>
           <small>© {new Date().getFullYear()} Harn Kun</small>
         </footer>
         </section>
