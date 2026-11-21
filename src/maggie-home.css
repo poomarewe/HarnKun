@@ -312,7 +312,7 @@ html[data-theme] body .app.maggie-app .home-create-button.home-create-featured >
 html[data-theme] body .app.maggie-app .home-create-button.home-create-featured > b { grid-column: 3; grid-row: 1 / 3; justify-self: end; font-size: 1.25rem; font-weight: 500; }
 
 html[data-theme] body .app.maggie-app .home-create-button.home-create-featured:active {
-  transform: translateY(4px);
+  translate: 0 4px;
   box-shadow: 0 1px 0 var(--mag-ink);
 }
 
@@ -600,7 +600,7 @@ html[data-theme] body .app.maggie-app .home-history-empty .home-empty-create-but
 
 /* Keep the fixed action centered while its pressed state gives vertical feedback. */
 html[data-theme] body .app.maggie-app.is-recent-page .home-create-primary:active {
-  transform: translateX(-50%) translateY(3px);
+  translate: 0 3px;
   box-shadow: 0 1px 0 #075243;
 }
 
@@ -1770,9 +1770,13 @@ html[data-theme] body .app.maggie-app .home-history-panel > .home-history-list {
     background: #efff79;
   }
 
-  html[data-theme] body .app.maggie-app .home-create-primary:active,
+  html[data-theme] body .app.maggie-app .home-create-primary:active {
+    translate: 0 4px;
+    box-shadow: 0 1px 0 #075243;
+  }
+
   html[data-theme] body .app.maggie-app.is-recent-page .home-create-primary:active {
-    transform: translateX(-50%) translateY(3px);
+    translate: 0 3px;
     box-shadow: 0 1px 0 #075243;
   }
 
@@ -2124,11 +2128,96 @@ html[data-theme] body .app.maggie-app .home-admin-message-status {
   font-weight: 800;
 }
 
+/* Phone copy: top-left corner of the green page. It is part of the header, so it scrolls away with the page. */
+html[data-theme] body .app.maggie-app .home-admin-message-fab-logo { display: none; }
+
 @media (max-width: 699px) {
-  html[data-theme] body .app.maggie-app .home-admin-message-fab {
-    right: 16px;
-    bottom: 120px;
-    width: 54px;
-    height: 54px;
+  html[data-theme] body .app.maggie-app .home-admin-message-fab:not(.home-admin-message-fab-logo) { display: none; }
+
+  html[data-theme] body .app.maggie-app .home-admin-message-fab-logo {
+    position: absolute;
+    top: calc(max(16px, env(safe-area-inset-top)) + 5px);
+    left: 16px;
+    z-index: 3;
+    display: grid;
+    width: 40px;
+    height: 40px;
+    margin: 0;
+    border: 2px solid #075243;
+    border-radius: 50%;
+    color: #7ce8a2;
+    background: #075243;
+    box-shadow: inset 0 0 0 2px #7ce8a2, 0 4px 0 #03362b;
   }
+
+  html[data-theme] body .app.maggie-app .home-admin-message-fab-logo svg {
+    width: 19px;
+    height: 19px;
+    transform: rotate(-12deg);
+  }
+
+  html[data-theme] body .app.maggie-app .home-admin-message-fab-logo:active {
+    transform: translateY(3px);
+    box-shadow: inset 0 0 0 2px #7ce8a2, 0 1px 0 #03362b;
+  }
+}
+
+/* Success pop: a centered green circle with a tick, shown after sending. */
+.home-message-sent-pop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: home-message-sent-fade 1.6s ease both;
+}
+
+.home-message-sent-circle {
+  display: grid;
+  width: 120px;
+  height: 120px;
+  place-items: center;
+  border: 3px solid #075243;
+  border-radius: 50%;
+  color: #7ce8a2;
+  background: #075243;
+  box-shadow: 0 8px 0 #03362b;
+  animation: home-message-sent-pop .42s cubic-bezier(.2, 1.3, .35, 1) both;
+}
+
+.home-message-sent-circle svg {
+  width: 62px;
+  height: 62px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@keyframes home-message-sent-pop {
+  0% { opacity: 0; transform: scale(.4); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes home-message-sent-fade {
+  0%, 80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+html[data-theme] body .app.maggie-app .home-admin-message-note {
+  margin: 0;
+  color: #075243;
+  font-size: .78rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* Split button press: keep its centering so it never jumps sideways.
+   The shared clay theme adds scale(.97) on press, which shifts the edges; the press depth comes from `translate` instead. */
+html[data-theme] body .app.maggie-app .home-create-button.home-create-primary:active { transform: none; }
+html[data-theme] body .app.maggie-app.is-recent-page .home-create-button.home-create-primary:active { transform: translateX(-50%); }
+@media (max-width: 699px) {
+  html[data-theme] body .app.maggie-app .home-create-button.home-create-primary:active { transform: translateX(-50%); }
 }

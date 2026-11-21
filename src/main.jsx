@@ -671,7 +671,14 @@ function App() {
   const [adminMessageContact, setAdminMessageContact] = useState('');
   const [adminMessageSending, setAdminMessageSending] = useState(false);
   const [adminMessageStatus, setAdminMessageStatus] = useState('');
+  const [adminMessageSentPop, setAdminMessageSentPop] = useState(false);
   const [menuOpenRequest, setMenuOpenRequest] = useState(0);
+
+  useEffect(() => {
+    if (!adminMessageSentPop) return undefined;
+    const hidePop = window.setTimeout(() => setAdminMessageSentPop(false), 1600);
+    return () => window.clearTimeout(hidePop);
+  }, [adminMessageSentPop]);
   const [menuCloseRequest, setMenuCloseRequest] = useState(0);
   const [homeHistorySwipe, setHomeHistorySwipe] = useState({ id: null, offset: 0, holding: false });
   const [removingHistoryId, setRemovingHistoryId] = useState(null);
@@ -2588,6 +2595,15 @@ function App() {
         <section className="home-landing-page" aria-label="Welcome to Harn Kun">
         <DoodleField variant="hero" className="home-hero-doodles" />
         <header className="home-header">
+          <button
+            type="button"
+            className="home-admin-message-fab home-admin-message-fab-logo"
+            aria-label="Send a message to the admin"
+            title="Send a message to the admin"
+            onClick={() => { setAdminMessageStatus(''); setAdminMessageOpen(true); }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 21 3l-5.5 18-4-7.5L3 11.5Z" /><path d="M11.5 13.5 21 3" /></svg>
+          </button>
           <div className="home-brand-row">
             <svg className="home-brand-mark" viewBox="0 0 36 36" aria-hidden="true">
               <circle cx="18" cy="18" r="17" />
@@ -2820,26 +2836,25 @@ function App() {
                       if (!response.ok) throw new Error(data.message || 'Could not send your message.');
                       setAdminMessageDraft('');
                       setAdminMessageContact('');
-                      setAdminMessageStatus('Thanks! Your message was sent to the admin.');
+                      setAdminMessageStatus('');
+                      setAdminMessageOpen(false);
+                      setAdminMessageSentPop(true);
                     } catch (sendError) {
                       setAdminMessageStatus(sendError.message || 'Could not send your message.');
                     } finally {
                       setAdminMessageSending(false);
                     }
                   }}>
-                    <div className="home-confirm-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24"><path d="M3 11.5 21 3l-5.5 18-4-7.5L3 11.5Z" /><path d="M11.5 13.5 21 3" /></svg>
-                    </div>
-                    <span>REPORT OR FEEDBACK</span>
-                    <h2 id="admin-message-title">Message the admin</h2>
+                    <h2 id="admin-message-title">Tell admin</h2>
+                    <p className="home-admin-message-note">Please think before sending. The admin who reads this gets sad.</p>
                     <label className="home-admin-message-field">
-                      <span>Your message</span>
+                      <span>Message</span>
                       <textarea
                         value={adminMessageDraft}
                         maxLength={1000}
                         rows={4}
                         required
-                        placeholder="Report a problem, or share an idea…"
+                        placeholder="What happened?"
                         onChange={(event) => setAdminMessageDraft(event.target.value)}
                       />
                     </label>
@@ -2849,7 +2864,7 @@ function App() {
                         type="text"
                         value={adminMessageContact}
                         maxLength={120}
-                        placeholder="Name, email or LINE ID"
+                        placeholder="Name or LINE ID"
                         onChange={(event) => setAdminMessageContact(event.target.value)}
                       />
                     </label>
@@ -2860,6 +2875,13 @@ function App() {
                     </div>
                   </form>
                 </BitsSurface>
+              </div>
+            )}
+            {adminMessageSentPop && (
+              <div className="home-message-sent-pop" role="status" aria-live="polite">
+                <span className="home-message-sent-circle" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M5 12.5 10 17 19 7" /></svg>
+                </span>
               </div>
             )}
           </>
