@@ -16,6 +16,7 @@ import useDialogKeyboard from './useDialogKeyboard';
 import { getBillTotals, isValidMoney, itemShare, MAX_BAHT, toSatang } from './money.js';
 import { saveHistoryRecord, readHistoryRecords, clearHistoryRecords, deleteHistoryRecord, subscribeHistoryChanges } from './history-store.js';
 import { clearBillDraft, readBillDraft, saveBillDraft } from './draft-store.js';
+import { t, intlLocale, useLanguage, PAGE_TITLE, PAGE_DESCRIPTION } from './i18n';
 import './critical.css';
 import './clay-home.css';
 import './maggie-home.css';
@@ -102,7 +103,7 @@ function NetworkStatusPill() {
   return createPortal(
     <div className={`network-status-pill is-${networkNotice}`} role="status" aria-live="polite">
       <span aria-hidden="true" />
-      {networkNotice === 'offline' ? 'You’re offline' : 'Back online'}
+      {networkNotice === 'offline' ? t("You’re offline") : t("Back online")}
     </div>,
     document.body,
   );
@@ -246,24 +247,24 @@ function BillShareQr({ record }) {
   }, [qrOpen]);
 
   return (
-    <section className="history-share-qr" aria-label="Share this bill">
-      <strong>Scan to see full detail</strong>
+    <section className="history-share-qr" aria-label={t("Share this bill")}>
+      <strong>{t("Scan to see full detail")}</strong>
       {qrShare ? (
-        <button type="button" className="history-share-qr-button" onClick={() => setQrOpen(true)} aria-label="Enlarge this bill QR code">
-          <img src={qrShare.imageUrl} alt="QR code for this bill's read-only details" />
+        <button type="button" className="history-share-qr-button" onClick={() => setQrOpen(true)} aria-label={t("Enlarge this bill QR code")}>
+          <img src={qrShare.imageUrl} alt={t("QR code for this bill's read-only details")} />
         </button>
       ) : (
-        <div className="history-share-qr-loading" role="status" aria-label="Generating QR code" />
+        <div className="history-share-qr-loading" role="status" aria-label={t("Generating QR code")} />
       )}
       {qrOpen && qrShare && createPortal(
         <div className="history-qr-modal-backdrop" role="presentation" onPointerDown={() => setQrOpen(false)}>
-          <section className="history-qr-modal" role="dialog" aria-modal="true" aria-label="Bill QR code" onPointerDown={(event) => event.stopPropagation()}>
-            <button type="button" className="history-qr-modal-close" onClick={() => setQrOpen(false)} aria-label="Close QR code">×</button>
-            <strong>Scan to see full detail</strong>
-            <a className="history-qr-modal-link" href={qrShare.shareUrl} target="_blank" rel="noreferrer" aria-label="Open the real read-only bill link">
-              <img src={qrShare.imageUrl} alt="Large QR code for this bill's read-only details" />
+          <section className="history-qr-modal" role="dialog" aria-modal="true" aria-label={t("Bill QR code")} onPointerDown={(event) => event.stopPropagation()}>
+            <button type="button" className="history-qr-modal-close" onClick={() => setQrOpen(false)} aria-label={t("Close QR code")}>×</button>
+            <strong>{t("Scan to see full detail")}</strong>
+            <a className="history-qr-modal-link" href={qrShare.shareUrl} target="_blank" rel="noreferrer" aria-label={t("Open the real read-only bill link")}>
+              <img src={qrShare.imageUrl} alt={t("Large QR code for this bill's read-only details")} />
             </a>
-            <a className="history-qr-open-link" href={qrShare.shareUrl} target="_blank" rel="noreferrer">Open bill detail ↗</a>
+            <a className="history-qr-open-link" href={qrShare.shareUrl} target="_blank" rel="noreferrer">{t("Open bill detail ↗")}</a>
           </section>
         </div>,
         document.body,
@@ -273,14 +274,14 @@ function BillShareQr({ record }) {
 }
 
 const createAutomaticEventName = () => {
-  const dateTime = new Intl.DateTimeFormat(undefined, {
+  const dateTime = new Intl.DateTimeFormat(intlLocale(), {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date());
-  return `Bill · ${dateTime}`;
+  return `${t('Bill')} · ${dateTime}`;
 };
 
 const RANDOM_HISTORY_EVENTS = ['Team lunch', 'Friday dinner', 'Coffee run', 'Weekend brunch', 'Game night'];
@@ -416,7 +417,7 @@ function HistoryCategoryIcon({ record }) {
   }
 
   return (
-    <span className={`history-card-category is-${category.key}`} title={category.label} aria-label={category.label}>
+    <span className={`history-card-category is-${category.key}`} title={t(category.label)} aria-label={t(category.label)}>
       <svg viewBox="0 0 24 24" aria-hidden="true">{icon}</svg>
     </span>
   );
@@ -431,9 +432,9 @@ function formatHistoryDayLabel(dayStart) {
   const today = getHistoryDayStart(Date.now());
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  if (dayStart === today) return 'Today';
-  if (dayStart === yesterday.getTime()) return 'Yesterday';
-  return new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(dayStart);
+  if (dayStart === today) return t("Today");
+  if (dayStart === yesterday.getTime()) return t("Yesterday");
+  return new Intl.DateTimeFormat(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(dayStart);
 }
 
 function normalizeThaiDigits(value) {
@@ -478,7 +479,7 @@ function selectWholeValue(event) {
 function canvasToJpeg(canvas, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('Could not compress this photo.'))),
+      (blob) => (blob ? resolve(blob) : reject(new Error(t("Could not compress this photo.")))),
       'image/jpeg',
       quality,
     );
@@ -488,7 +489,7 @@ function canvasToJpeg(canvas, quality) {
 function canvasToPng(canvas) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('Could not create the summary picture.'))),
+      (blob) => (blob ? resolve(blob) : reject(new Error(t("Could not create the summary picture.")))),
       'image/png',
     );
   });
@@ -531,7 +532,7 @@ async function prepareBillUpload(file) {
 
   let blob = await canvasToJpeg(canvas, 0.8);
   if (blob.size > targetBytes) blob = await canvasToJpeg(canvas, 0.62);
-  if (blob.size > targetBytes) throw new Error('This photo is still too large after compression.');
+  if (blob.size > targetBytes) throw new Error(t("This photo is still too large after compression."));
 
   return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'bill'}.jpg`, {
     type: 'image/jpeg',
@@ -644,6 +645,7 @@ function parseThaiBill(ocrText, tsv) {
 }
 
 function App() {
+  const { lang, setLanguage } = useLanguage();
   useVisitorAnalytics();
   useDialogKeyboard();
   const isSharedHistoryRoute = window.location.pathname === '/history';
@@ -799,6 +801,12 @@ function App() {
     const finishIntro = window.setTimeout(() => setShowIntro(false), 1850);
     return () => window.clearTimeout(finishIntro);
   }, [showIntro]);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.title = t(PAGE_TITLE);
+    document.querySelector('meta[name="description"]')?.setAttribute('content', t(PAGE_DESCRIPTION));
+  }, [lang]);
 
   useEffect(() => {
     const themeBackground = '#ffffff';
@@ -1219,9 +1227,9 @@ function App() {
         const { records, invalidCount } = await readHistoryRecords();
         if (!active || current !== generation) return;
         setHistoryRecords(records);
-        setHistoryWarning(invalidCount ? `${invalidCount} saved bill(s) could not be displayed. Their data has been kept on this device.` : '');
+        setHistoryWarning(invalidCount ? t('{count} saved bill(s) could not be displayed. Their data has been kept on this device.', { count: invalidCount }) : '');
       } catch {
-        if (active && current === generation) setHistoryWarning('Recent bills are unavailable. Check browser storage permissions and try again.');
+        if (active && current === generation) setHistoryWarning(t("Recent bills are unavailable. Check browser storage permissions and try again."));
       } finally {
         if (active && current === generation) setHistoryLoading(false);
       }
@@ -1303,7 +1311,7 @@ function App() {
       try {
         await loadAppStyles();
       } catch {
-        setHistoryDetailError('Your bill draft is safe, but its form could not load. Tap Continue your bill to retry.');
+        setHistoryDetailError(t("Your bill draft is safe, but its form could not load. Tap Continue your bill to retry."));
         return;
       }
       setHistoryDetailError('');
@@ -1314,7 +1322,7 @@ function App() {
     try {
       await loadAppStyles();
     } catch {
-      setHistoryDetailError('The bill form could not load. Tap Split a bill to retry.');
+      setHistoryDetailError(t("The bill form could not load. Tap Split a bill to retry."));
       return;
     }
     setHistoryDetailError('');
@@ -1373,7 +1381,7 @@ function App() {
       setClearHistoryConfirmOpen(false);
     } catch (historyError) {
       console.error('Could not clear local history:', historyError);
-      window.alert('Could not clear history. Please try again.');
+      window.alert(t("Could not clear history. Please try again."));
     } finally {
       setHistoryLoading(false);
     }
@@ -1404,7 +1412,7 @@ function App() {
     try {
       await loadAppStyles();
     } catch {
-      setHistoryDetailError('Bill details could not load. Tap the bill to try again.');
+      setHistoryDetailError(t("Bill details could not load. Tap the bill to try again."));
       return;
     }
     setHistoryDetailError('');
@@ -1461,7 +1469,7 @@ function App() {
     loadAppStyles();
     const sharedValue = new URLSearchParams(window.location.search).get('r');
     if (!sharedValue) {
-      setError('This shared bill link is missing its bill details.');
+      setError(t("This shared bill link is missing its bill details."));
       return;
     }
 
@@ -1474,7 +1482,7 @@ function App() {
         setHistoryView('detail');
       } catch (sharedReceiptError) {
         console.error('Could not open shared receipt:', sharedReceiptError);
-        setError('This shared receipt link is invalid or incomplete.');
+        setError(t("This shared receipt link is invalid or incomplete."));
       }
     };
     openSharedReceipt();
@@ -1531,7 +1539,7 @@ function App() {
       }
     } catch (deleteError) {
       console.error('Could not delete history record:', deleteError);
-      window.alert('Could not delete this bill. Please try again.');
+      window.alert(t("Could not delete this bill. Please try again."));
     } finally {
       setRemovingHistoryId(null);
       setHomeHistorySwipe({ id: null, offset: 0, holding: false });
@@ -1593,11 +1601,11 @@ function App() {
 
     if (!name) return;
     if (friends.length >= 100) {
-      setError('You can add up to 100 people.');
+      setError(t("You can add up to 100 people."));
       return;
     }
     if (friends.some((friend) => friend.toLocaleLowerCase() === name.toLocaleLowerCase())) {
-      setError(`${name} is already in the list.`);
+      setError(t('{name} is already in the list.', { name }));
       return;
     }
 
@@ -1616,7 +1624,7 @@ function App() {
 
   const continueToBill = () => {
     if (!eventName.trim()) {
-      setError('Add a name for this bill before continuing.');
+      setError(t("Add a name for this bill before continuing."));
       return;
     }
     if (friends.length < 2) return;
@@ -1629,11 +1637,11 @@ function App() {
   const scanBill = async (file) => {
     if (!file || scanInFlightRef.current) return;
     if (cooldownRemaining > 0) {
-      setError(`Please wait ${cooldownRemaining} seconds before scanning another bill.`);
+      setError(t('Please wait {seconds} seconds before scanning another bill.', { seconds: cooldownRemaining }));
       return;
     }
     if (!file.type.startsWith('image/')) {
-      setError('Please choose a photo of the bill.');
+      setError(t("Please choose a photo of the bill."));
       return;
     }
 
@@ -1643,7 +1651,7 @@ function App() {
       uploadFile = await prepareBillUpload(file);
     } catch (compressionError) {
       scanInFlightRef.current = false;
-      setError(compressionError instanceof Error ? compressionError.message : 'Could not prepare this photo.');
+      setError(compressionError instanceof Error ? compressionError.message : t("Could not prepare this photo."));
       return;
     }
 
@@ -1692,12 +1700,12 @@ function App() {
       setEditingBillIndex(null);
       setOcrStatus('review');
       if (detectedItems.length === 0) {
-        setError('No bill items were detected. Add them manually or try a clearer photo.');
+        setError(t("No bill items were detected. Add them manually or try a clearer photo."));
       }
     } catch (scanError) {
       setOcrStatus('idle');
-      const message = scanError instanceof Error ? scanError.message : String(scanError || 'Unknown scanning error');
-      setError(`Could not scan this photo: ${message}`);
+      const message = scanError instanceof Error ? scanError.message : String(scanError || t('Unknown scanning error'));
+      setError(t('Could not scan this photo: {message}', { message }));
     } finally {
       scanInFlightRef.current = false;
       window.clearInterval(progressTimer);
@@ -1707,7 +1715,7 @@ function App() {
   const openBillCropEditor = (file, source) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('Please choose an image of the bill.');
+      setError(t("Please choose an image of the bill."));
       return;
     }
 
@@ -1910,7 +1918,7 @@ function App() {
       closeCameraFlow();
       scanBill(croppedFile);
     } catch {
-      setError('Could not crop this photo. Please try again.');
+      setError(t("Could not crop this photo. Please try again."));
       setIsCropping(false);
     }
   };
@@ -1932,20 +1940,20 @@ function App() {
 
   const addManualItemFromComposer = (event) => {
     event.preventDefault();
-    if (billItems.length >= 1000) { setError('This bill can contain up to 1,000 items.'); return; }
+    if (billItems.length >= 1000) { setError(t("This bill can contain up to 1,000 items.")); return; }
     const name = manualItemName.trim();
     const amount = Number(manualItemPrice);
     const quantity = Number(manualQuantity);
     if (!name || manualItemPrice === '' || !Number.isFinite(amount) || amount < 0) {
-      setError('Add an item name and a valid price.');
+      setError(t("Add an item name and a valid price."));
       return;
     }
     if (!Number.isInteger(quantity) || quantity < 1) {
-      setError('Quantity must be at least 1.');
+      setError(t("Quantity must be at least 1."));
       return;
     }
     if (!isValidMoney(amount)) {
-      setError(`Prices must be between 0 and ${MAX_BAHT.toLocaleString()} baht.`);
+      setError(t('Prices must be between 0 and {max} baht.', { max: MAX_BAHT.toLocaleString() }));
       return;
     }
     setBillItems((currentItems) => [...currentItems, { name, quantity, amount: toSatang(amount) / 100 }]);
@@ -1964,7 +1972,7 @@ function App() {
       || !Number.isSafeInteger(Number(item.quantity)) || Number(item.quantity) < 1)
       || (vatEnabled && (!isValidMoney(vatRate) || Number(vatRate) > 100))
       || (discountEnabled && !isValidMoney(discountAmount))) {
-      setError('Check every item name, non-negative price, whole quantity, VAT (0–100%), and discount before continuing.');
+      setError(t("Check every item name, non-negative price, whole quantity, VAT (0–100%), and discount before continuing."));
       return;
     }
     const cleanItemEntries = billItems
@@ -1972,7 +1980,7 @@ function App() {
       .filter(({ item }) => item.name.trim());
     const cleanItems = cleanItemEntries.map(({ item }) => ({ ...item, amount: toSatang(item.amount) / 100, quantity: Number(item.quantity) }));
     if (cleanItems.length === 0) {
-      setError('Add at least one bill item before splitting.');
+      setError(t("Add at least one bill item before splitting."));
       return;
     }
 
@@ -2083,7 +2091,7 @@ function App() {
         setHistoryRecords((records) => [historyRecord, ...records.filter((record) => record.id !== historyId)]);
         saved = true;
       } catch (historyError) {
-        setError(`This split could not be saved. Keep this page open or download a picture. ${historyError.message || 'Check available browser storage and retry.'}`);
+        setError(t('This split could not be saved. Keep this page open or download a picture. {detail}', { detail: historyError.message || t('Check available browser storage and retry.') }));
       }
       setHistorySaved(saved);
       if (saved) sendCompletedBillAnalytics(historyRecord);
@@ -2102,7 +2110,7 @@ function App() {
 
   const goToNextFood = () => {
     if ((allocations[splitIndex] || []).length === 0) {
-      setError('Choose at least one person for this item.');
+      setError(t("Choose at least one person for this item."));
       return;
     }
     if (splitIndex === billItems.length - 1) {
@@ -2396,15 +2404,15 @@ function App() {
 
       context.fillStyle = exportColors.primary;
       context.font = '700 27px "Mali", cursive';
-      context.fillText('SCAN TO SEE BILL DETAILS', 368, qrTop + 68, 596);
+      context.fillText(t("SCAN TO SEE BILL DETAILS"), 368, qrTop + 68, 596);
       context.fillStyle = exportColors.text;
       context.font = '700 29px "Mali", cursive';
-      context.fillText('Open the full item and payment', 368, qrTop + 116, 596);
-      context.fillText('breakdown on any phone', 368, qrTop + 153, 596);
+      context.fillText(t("Open the full item and payment"), 368, qrTop + 116, 596);
+      context.fillText(t("breakdown on any phone"), 368, qrTop + 153, 596);
       context.fillStyle = exportColors.subtext;
       context.font = '600 23px "Mali", cursive';
       context.fillText('Harn.fun/history', 368, qrTop + 202, 596);
-      context.fillText('Anyone with this QR can view this bill.', 368, qrTop + 240, 596);
+      context.fillText(t("Anyone with this QR can view this bill."), 368, qrTop + 240, 596);
 
       context.fillStyle = exportColors.footer;
       context.font = '700 23px "Mali", cursive';
@@ -2440,7 +2448,7 @@ function App() {
       downloadBlob(blob, fileName);
     } catch (downloadError) {
       console.error('Could not export summary picture:', downloadError);
-      setError(downloadError instanceof Error ? downloadError.message : 'Could not download the summary picture.');
+      setError(downloadError instanceof Error ? downloadError.message : t("Could not download the summary picture."));
     }
   };
 
@@ -2450,24 +2458,24 @@ function App() {
         <DoodleField variant="shared" className="shared-receipt-doodles" />
         <NetworkStatusPill />
         <small className="app-version" title={`Git version from ${APP_VERSION_TIME}`}>{APP_VERSION}</small>
-        <section className="shared-receipt-shell" aria-label="Shared bill details">
+        <section className="shared-receipt-shell" aria-label={t("Shared bill details")}>
           <header className="shared-receipt-header">
-            <a href="/" className="shared-receipt-brand" aria-label="Go to Harn Kun home">Harn Kun</a>
-            <span>READ ONLY</span>
+            <a href="/" className="shared-receipt-brand" aria-label={t("Go to Harn Kun home")}>{t("Harn Kun")}</a>
+            <span>{t("READ ONLY")}</span>
           </header>
 
           {!selectedHistory?.isShared && !error && (
-            <div className="shared-receipt-loading" role="status" aria-label="Loading shared bill">
+            <div className="shared-receipt-loading" role="status" aria-label={t("Loading shared bill")}>
               <i /><i /><i /><i />
             </div>
           )}
 
           {!selectedHistory?.isShared && error && (
             <div className="shared-receipt-error" role="alert">
-              <span>INVALID LINK</span>
-              <h1>Could not open this bill</h1>
+              <span>{t("INVALID LINK")}</span>
+              <h1>{t("Could not open this bill")}</h1>
               <p>{error}</p>
-              <a href="/">Go to Harn Kun</a>
+              <a href="/">{t("Go to Harn Kun")}</a>
             </div>
           )}
 
@@ -2475,44 +2483,44 @@ function App() {
             <article className="shared-receipt-detail">
               <div className="shared-receipt-title">
                 <div>
-                  <span>SHARED BILL</span>
+                  <span>{t("SHARED BILL")}</span>
                   <h1>{selectedHistory.eventName}</h1>
-                  <p>{new Date(selectedHistory.updatedAt).toLocaleString()}</p>
+                  <p>{new Date(selectedHistory.updatedAt).toLocaleString(intlLocale())}</p>
                 </div>
                 <div className="shared-receipt-total">
-                  <span>TOTAL</span>
+                  <span>{t("TOTAL")}</span>
                   <strong>฿{Number(selectedHistory.total).toFixed(2)}</strong>
                   {(selectedHistory.vatEnabled || selectedHistory.discountEnabled) && (
                     <div className="shared-receipt-adjustments">
-                      <small>Subtotal <b>฿{Number(selectedHistory.subtotal).toFixed(2)}</b></small>
-                      {selectedHistory.vatEnabled && <small>VAT {Number(selectedHistory.vatRate)}% <b>+฿{Number(selectedHistory.vatAmount).toFixed(2)}</b></small>}
-                      {selectedHistory.discountEnabled && <small>Discount <b>−฿{Number(selectedHistory.discountAmount).toFixed(2)}</b></small>}
+                      <small>{t("Subtotal")} <b>฿{Number(selectedHistory.subtotal).toFixed(2)}</b></small>
+                      {selectedHistory.vatEnabled && <small>{t('VAT')} {Number(selectedHistory.vatRate)}% <b>+฿{Number(selectedHistory.vatAmount).toFixed(2)}</b></small>}
+                      {selectedHistory.discountEnabled && <small>{t("Discount")} <b>−฿{Number(selectedHistory.discountAmount).toFixed(2)}</b></small>}
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="shared-receipt-stats" aria-label="Bill summary">
-                <div><strong>{selectedHistory.friends.length}</strong><span>People sharing this bill</span></div>
-                <div><strong>{selectedHistory.billItems.length}</strong><span>Bill items</span></div>
-                <div><strong>{selectedHistory.allocations.reduce((sum, names) => sum + names.length, 0)}</strong><span>Item assignments</span></div>
+              <div className="shared-receipt-stats" aria-label={t("Bill summary")}>
+                <div><strong>{selectedHistory.friends.length}</strong><span>{t("People sharing this bill")}</span></div>
+                <div><strong>{selectedHistory.billItems.length}</strong><span>{t("Bill items")}</span></div>
+                <div><strong>{selectedHistory.allocations.reduce((sum, names) => sum + names.length, 0)}</strong><span>{t("Item assignments")}</span></div>
               </div>
 
               <section className="shared-receipt-section">
-                <div className="shared-receipt-section-heading"><span>PEOPLE ON THIS BILL</span><b>{selectedHistory.friends.length}</b></div>
+                <div className="shared-receipt-section-heading"><span>{t("PEOPLE ON THIS BILL")}</span><b>{selectedHistory.friends.length}</b></div>
                 <div className="shared-receipt-people">
                   {selectedHistory.friends.map((friend, index) => (
                     <div className="shared-receipt-person" key={friend}>
                       <span>{index + 1}</span>
                       <strong>{friend}</strong>
-                      <small>{selectedHistory.allocations.filter((names) => names.includes(friend)).length} shared items</small>
+                      <small>{selectedHistory.allocations.filter((names) => names.includes(friend)).length} {t('shared items')}</small>
                     </div>
                   ))}
                 </div>
               </section>
 
               <section className="shared-receipt-section">
-                <div className="shared-receipt-section-heading"><span>ITEMS & SHARING</span><b>{selectedHistory.billItems.length}</b></div>
+                <div className="shared-receipt-section-heading"><span>{t('ITEMS & SHARING')}</span><b>{selectedHistory.billItems.length}</b></div>
                 <div className="shared-receipt-items">
                   {selectedHistory.billItems.map((item, index) => {
                     const sharedWith = selectedHistory.allocations[index] || [];
@@ -2522,19 +2530,19 @@ function App() {
                           <span className="shared-receipt-number">{index + 1}</span>
                           <div>
                             <strong>{item.name}</strong>
-                            <small>Quantity {item.quantity}</small>
+                            <small>{t('Quantity')} {item.quantity}</small>
                           </div>
-                          <div className="shared-receipt-item-amount"><small>ITEM TOTAL</small><b>฿{Number(item.amount).toFixed(2)}</b></div>
+                          <div className="shared-receipt-item-amount"><small>{t("ITEM TOTAL")}</small><b>฿{Number(item.amount).toFixed(2)}</b></div>
                         </header>
                         <div className="shared-receipt-item-sharing">
-                          <span>SHARED WITH {sharedWith.length} {sharedWith.length === 1 ? 'PERSON' : 'PEOPLE'}</span>
+                          <span>{t('SHARED WITH')} {sharedWith.length} {sharedWith.length === 1 ? t('PERSON') : t('PEOPLE')}</span>
                           {sharedWith.length > 0 ? (
                             <div>
                               {sharedWith.map((friend, friendIndex) => (
                                 <span key={friend}><strong>{friend}</strong><small>฿{itemShare(item.amount, sharedWith.length, friendIndex).toFixed(2)}</small></span>
                               ))}
                             </div>
-                          ) : <p>No people selected for this item.</p>}
+                          ) : <p>{t("No people selected for this item.")}</p>}
                         </div>
                       </article>
                     );
@@ -2543,21 +2551,21 @@ function App() {
               </section>
 
               <section className="shared-receipt-section">
-                <div className="shared-receipt-section-heading"><span>PAYMENT BREAKDOWN</span><b>{selectedHistory.settlements.length}</b></div>
+                <div className="shared-receipt-section-heading"><span>{t("PAYMENT BREAKDOWN")}</span><b>{selectedHistory.settlements.length}</b></div>
                 <div className="shared-receipt-payments">
                   {selectedHistory.settlements.map((settlement, index) => (
                     <article className="shared-receipt-payment" key={`${settlement.name}-${index}`}>
                       <span>{index + 1}</span>
-                      <div><strong>{settlement.name}</strong><small>Total amount to pay</small></div>
-                      <div><b>฿{Number(settlement.amount).toFixed(2)}</b><small>{Number(selectedHistory.total) > 0 ? `${(Number(settlement.amount) / Number(selectedHistory.total) * 100).toFixed(1)}% of bill` : '0% of bill'}</small></div>
+                      <div><strong>{settlement.name}</strong><small>{t("Total amount to pay")}</small></div>
+                      <div><b>฿{Number(settlement.amount).toFixed(2)}</b><small>{Number(selectedHistory.total) > 0 ? `${(Number(settlement.amount) / Number(selectedHistory.total) * 100).toFixed(1)}% ${t('of bill')}` : `0% ${t('of bill')}`}</small></div>
                     </article>
                   ))}
                 </div>
               </section>
 
               <footer className="shared-receipt-footer">
-                <span>This bill is shared as read-only.</span>
-                <a href="/">Create a bill with Harn Kun</a>
+                <span>{t("This bill is shared as read-only.")}</span>
+                <a href="/">{t("Create a bill with Harn Kun")}</a>
               </footer>
             </article>
           )}
@@ -2591,16 +2599,16 @@ function App() {
           </div>
         </div>
       )}
-      <section className="home-dashboard" aria-label="Harn Kun home">
-        <section className="home-landing-page" aria-label="Welcome to Harn Kun">
+      <section className="home-dashboard" aria-label={t("Harn Kun home")}>
+        <section className="home-landing-page" aria-label={t("Welcome to Harn Kun")}>
         <DoodleField variant="hero" className="home-hero-doodles" />
         <header className="home-header">
           <button
             type="button"
             className="home-admin-message-fab home-admin-message-fab-logo"
             data-label="Feedback"
-            aria-label="Send a message to the admin"
-            title="Send a message to the admin"
+            aria-label={t("Send a message to the admin")}
+            title={t("Send a message to the admin")}
             onClick={() => { setAdminMessageStatus(''); setAdminMessageOpen(true); }}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 21 3l-5.5 18-4-7.5L3 11.5Z" /><path d="M11.5 13.5 21 3" /></svg>
@@ -2611,17 +2619,17 @@ function App() {
               <path d="M10 13h16M10 18h12M10 23h8" />
               <path className="home-brand-leaf" d="M25 3c1-3 3-4 6-3-1 3-3 4-6 3Z" />
             </svg>
-            <h1 onClick={handleBrandHistoryClick}>Harn Kun</h1>
-            <a className="home-language-switch" href="/th/" lang="th" aria-label="เปลี่ยนภาษาเป็นภาษาไทย">ไทย</a>
+            <h1 onClick={handleBrandHistoryClick}>{t("Harn Kun")}</h1>
+            <button type="button" className="home-language-switch" lang={lang === 'th' ? 'en' : 'th'} onClick={() => setLanguage(lang === 'th' ? 'en' : 'th')} title={t(lang === 'th' ? 'Switch to English' : 'Switch to Thai')}>{lang === 'th' ? 'EN' : 'ไทย'}</button>
           </div>
-          <p>Split bills with friends, scan receipts, and see who owes what.</p>
+          <p>{t("Split bills with friends, scan receipts, and see who owes what.")}</p>
           <div className="home-hero">
             <div className="home-hero-copy">
-              <p className="home-hero-tagline">Split the bill with your people, minus the awkward math.</p>
+              <p className="home-hero-tagline">{t("Split the bill with your people, minus the awkward math.")}</p>
             </div>
           </div>
           <div className="home-scroll-cue" aria-hidden="true">
-            <span>Scroll Down</span>
+            <span>{t("Scroll Down")}</span>
             <svg viewBox="0 0 20 20"><path d="M10 3v12m-5-5 5 5 5-5" /></svg>
           </div>
         </header>
@@ -2635,28 +2643,28 @@ function App() {
           onClick={openPanel}
         >
           <span aria-hidden="true">{hasActiveDraft ? '▶' : '+'}</span>
-          <strong>{hasActiveDraft ? 'Continue your bill' : 'Split a bill'}</strong>
-          <small>Add friends, scan, and split in a few taps</small>
+          <strong>{hasActiveDraft ? t("Continue your bill") : t("Split a bill")}</strong>
+          <small>{t("Add friends, scan, and split in a few taps")}</small>
           <b aria-hidden="true">›</b>
         </BitsButton>
 
 
-        <section className="home-history-panel" aria-label="Recent bills">
+        <section className="home-history-panel" aria-label={t("Recent bills")}>
           <DoodleField variant="history" className="home-history-doodles" />
                 <div className="home-recent-heading">
-          <div><span>ON THIS DEVICE</span><h2>Recent bills</h2></div>
+          <div><span>{t("ON THIS DEVICE")}</span><h2>{t("Recent bills")}</h2></div>
           <div className="home-history-actions">
             <b>{historyRecords.length}</b>
             <div className="home-history-sort-control" ref={sortDrawerRef}>
-              <BitsButton type="button" className="home-history-sort" aria-label="Sort recent bills" aria-haspopup="listbox" aria-expanded={sortDrawerOpen} onClick={() => setSortDrawerOpen((open) => !open)}>
-                <span>{{ newest: 'Newest', oldest: 'Oldest', highest: 'High total', lowest: 'Low total' }[historySort]}</span>
+              <BitsButton type="button" className="home-history-sort" aria-label={t("Sort recent bills")} aria-haspopup="listbox" aria-expanded={sortDrawerOpen} onClick={() => setSortDrawerOpen((open) => !open)}>
+                <span>{{ newest: t("Newest"), oldest: t("Oldest"), highest: t("High total"), lowest: t("Low total") }[historySort]}</span>
               </BitsButton>
-              <div className={`home-sort-drawer${sortDrawerOpen ? ' is-open' : ''}`} role="listbox" aria-label="Sort recent bills">
+              <div className={`home-sort-drawer${sortDrawerOpen ? ' is-open' : ''}`} role="listbox" aria-label={t("Sort recent bills")}>
                 {[
-                  ['newest', 'Newest'],
-                  ['oldest', 'Oldest'],
-                  ['highest', 'Highest total'],
-                  ['lowest', 'Lowest total'],
+                  ['newest', t("Newest")],
+                  ['oldest', t("Oldest")],
+                  ['highest', t("Highest total")],
+                  ['lowest', t("Lowest total")],
                 ].filter(([value]) => value !== historySort).map(([value, label]) => (
                   <BitsButton
                     type="button"
@@ -2674,7 +2682,7 @@ function App() {
                 ))}
               </div>
             </div>
-            <BitsButton type="button" className="home-clear-history" disabled={historyLoading || historyRecords.length === 0} onClick={clearHistory} aria-label="Clear history">
+            <BitsButton type="button" className="home-clear-history" disabled={historyLoading || historyRecords.length === 0} onClick={clearHistory} aria-label={t("Clear history")}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" />
               </svg>
@@ -2686,7 +2694,7 @@ function App() {
         {historyDetailError && <p className="form-error" role="alert">{historyDetailError}</p>}
         <div className={`home-history-list${!historyLoading && historyRecords.length === 0 ? ' is-empty' : ''}`} aria-live="polite">
           {historyLoading && (
-            <div className="home-history-skeleton" role="status" aria-label="Loading recent bills">
+            <div className="home-history-skeleton" role="status" aria-label={t("Loading recent bills")}>
               {[0, 1, 2].map((item) => (
                 <div className="home-history-skeleton-card" aria-hidden="true" key={item}>
                   <span className="skeleton-line skeleton-line-date" />
@@ -2701,11 +2709,11 @@ function App() {
             <BitsSurface className="home-history-empty">
               <Doodle kind="plate" className="home-empty-art" />
               <div className="home-history-empty-copy">
-                <span>READY WHEN YOU ARE</span>
-                <strong>No bills yet</strong>
-                <p>Create your first bill split and it will appear here.</p>
+                <span>{t("READY WHEN YOU ARE")}</span>
+                <strong>{t("No bills yet")}</strong>
+                <p>{t("Create your first bill split and it will appear here.")}</p>
               </div>
-              <BitsButton type="button" className="home-empty-create-button" onClick={openPanel}>Create your first bill <span aria-hidden="true">→</span></BitsButton>
+              <BitsButton type="button" className="home-empty-create-button" onClick={openPanel}>{t("Create your first bill")} <span aria-hidden="true">→</span></BitsButton>
             </BitsSurface>
           )}
           {!historyLoading && groupedHistoryRecords.map((group) => (
@@ -2755,8 +2763,8 @@ function App() {
                 <HistoryCategoryIcon record={record} />
                 <span className="history-card-date">
                   {historySort === 'newest'
-                    ? new Date(record.updatedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-                    : new Date(record.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                    ? new Date(record.updatedAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit' })
+                    : new Date(record.updatedAt).toLocaleDateString(intlLocale(), { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
                 <strong>{record.eventName}</strong>
                 <span className="history-card-people" aria-hidden="true">
@@ -2766,7 +2774,7 @@ function App() {
                   })}
                   {record.friends.length > 3 && <span className="history-card-people-more">+{record.friends.length - 3}</span>}
                 </span>
-                <small>{record.friends.length} people · {record.billItems.length} items</small>
+                <small>{record.friends.length} {t('people')} · {record.billItems.length} {t('items')}</small>
                 <b>฿{Number(record.total).toFixed(2)}</b>
                 <i aria-hidden="true">›</i>
               </BitsButton>
@@ -2775,18 +2783,18 @@ function App() {
             </section>
           ))}
         </div>
-        <footer className="home-history-footer" aria-label="Harn Kun footer">
+        <footer className="home-history-footer" aria-label={t("Harn Kun footer")}>
           <div className="home-history-footer-brand">
             <svg className="home-history-footer-mark" viewBox="0 0 36 36" aria-hidden="true">
               <circle cx="18" cy="18" r="17" />
               <path d="M10 13h16M10 18h12M10 23h8" />
             </svg>
             <div>
-              <strong>Harn Kun</strong>
-              <span>Good times, shared fairly.</span>
+              <strong>{t("Harn Kun")}</strong>
+              <span>{t("Good times, shared fairly.")}</span>
             </div>
           </div>
-          <a className="home-history-footer-instagram" href="https://www.instagram.com/saaninchak/" target="_blank" rel="noopener noreferrer">@saaninchak</a>
+          <a className="home-history-footer-instagram" href="https://www.instagram.com/saaninchak/" target="_blank" rel="noopener noreferrer">{t("@saaninchak")}</a>
           <small>© {new Date().getFullYear()} Harn Kun</small>
         </footer>
         </section>
@@ -2801,8 +2809,8 @@ function App() {
               type="button"
               className="home-admin-message-fab"
               data-label="Feedback"
-              aria-label="Send a message to the admin"
-              title="Send a message to the admin"
+              aria-label={t("Send a message to the admin")}
+              title={t("Send a message to the admin")}
               onClick={() => { setAdminMessageStatus(''); setAdminMessageOpen(true); }}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 21 3l-5.5 18-4-7.5L3 11.5Z" /><path d="M11.5 13.5 21 3" /></svg>
@@ -2824,45 +2832,45 @@ function App() {
                         body: JSON.stringify({ message: text, contact: adminMessageContact.trim() }),
                       });
                       const data = await response.json().catch(() => ({}));
-                      if (!response.ok) throw new Error(data.message || 'Could not send your message.');
+                      if (!response.ok) throw new Error(data.message || t("Could not send your message."));
                       setAdminMessageDraft('');
                       setAdminMessageContact('');
                       setAdminMessageStatus('');
                       setAdminMessageOpen(false);
                       setAdminMessageSentPop(true);
                     } catch (sendError) {
-                      setAdminMessageStatus(sendError.message || 'Could not send your message.');
+                      setAdminMessageStatus(sendError.message || t("Could not send your message."));
                     } finally {
                       setAdminMessageSending(false);
                     }
                   }}>
-                    <h2 id="admin-message-title">Tell admin</h2>
-                    <p className="home-admin-message-note">Please think before sending. The admin who reads this gets sad.</p>
+                    <h2 id="admin-message-title">{t("Tell admin")}</h2>
+                    <p className="home-admin-message-note">{t("Please think before sending. The admin who reads this gets sad.")}</p>
                     <label className="home-admin-message-field">
-                      <span>Message</span>
+                      <span>{t("Message")}</span>
                       <textarea
                         value={adminMessageDraft}
                         maxLength={1000}
                         rows={4}
                         required
-                        placeholder="What happened?"
+                        placeholder={t("What happened?")}
                         onChange={(event) => setAdminMessageDraft(event.target.value)}
                       />
                     </label>
                     <label className="home-admin-message-field">
-                      <span>Contact (optional)</span>
+                      <span>{t('Contact (optional)')}</span>
                       <input
                         type="text"
                         value={adminMessageContact}
                         maxLength={120}
-                        placeholder="Name or LINE ID"
+                        placeholder={t("Name or LINE ID")}
                         onChange={(event) => setAdminMessageContact(event.target.value)}
                       />
                     </label>
                     {adminMessageStatus && <p className="home-admin-message-status" role="status">{adminMessageStatus}</p>}
                     <div className="home-confirm-actions">
-                      <BitsButton type="button" disabled={adminMessageSending} onClick={() => setAdminMessageOpen(false)}>Close</BitsButton>
-                      <BitsButton type="submit" disabled={adminMessageSending || !adminMessageDraft.trim()}>{adminMessageSending ? 'Sending…' : 'Send'}</BitsButton>
+                      <BitsButton type="button" disabled={adminMessageSending} onClick={() => setAdminMessageOpen(false)}>{t("Close")}</BitsButton>
+                      <BitsButton type="submit" disabled={adminMessageSending || !adminMessageDraft.trim()}>{adminMessageSending ? t("Sending…") : t("Send")}</BitsButton>
                     </div>
                   </form>
                 </BitsSurface>
@@ -2884,12 +2892,12 @@ function App() {
               <div className="home-confirm-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" /></svg>
               </div>
-              <span>DELETE HISTORY</span>
-              <h2 id="clear-history-title">Remove all bills?</h2>
-              <p id="clear-history-description">This will permanently remove all {historyRecords.length} bills stored on this device.</p>
+              <span>{t("DELETE HISTORY")}</span>
+              <h2 id="clear-history-title">{t("Remove all bills?")}</h2>
+              <p id="clear-history-description">{t('This will permanently remove all {count} bills stored on this device.', { count: historyRecords.length })}</p>
               <div className="home-confirm-actions">
-                <BitsButton type="button" disabled={historyLoading} onClick={() => setClearHistoryConfirmOpen(false)}>Cancel</BitsButton>
-                <BitsButton type="button" className="home-confirm-delete" disabled={historyLoading} onClick={confirmClearHistory}>{historyLoading ? 'Removing…' : 'Remove all bills'}</BitsButton>
+                <BitsButton type="button" disabled={historyLoading} onClick={() => setClearHistoryConfirmOpen(false)}>{t("Cancel")}</BitsButton>
+                <BitsButton type="button" className="home-confirm-delete" disabled={historyLoading} onClick={confirmClearHistory}>{historyLoading ? t("Removing…") : t("Remove all bills")}</BitsButton>
               </div>
             </BitsSurface>
           </div>
@@ -2906,11 +2914,11 @@ function App() {
             <DoodleField variant="drawer" className="history-doodles" />
             <div className="panel-heading history-panel-heading">
               <div>
-                <div className="panel-meta"><span>{selectedHistory?.isShared ? 'SHARED RECEIPT' : 'ON THIS DEVICE'}</span></div>
-                <h2>{historyView === 'detail' ? selectedHistory?.eventName : 'History'}</h2>
+                <div className="panel-meta"><span>{selectedHistory?.isShared ? t("SHARED RECEIPT") : t("ON THIS DEVICE")}</span></div>
+                <h2>{historyView === 'detail' ? selectedHistory?.eventName : t("History")}</h2>
               </div>
               {historyView === 'detail' && selectedHistory && !selectedHistory.isShared && (
-                <BitsButton type="button" className="history-edit-icon-button" onClick={() => editHistoryRecord(selectedHistory)} aria-label="Edit this bill" title="Edit this bill">
+                <BitsButton type="button" className="history-edit-icon-button" onClick={() => editHistoryRecord(selectedHistory)} aria-label={t("Edit this bill")} title={t("Edit this bill")}>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.2 5.8 4 4M4 20l4.3-.9L19 8.4a2.1 2.1 0 0 0-3-3L5.3 16.1 4 20Z" /></svg>
                 </BitsButton>
               )}
@@ -2919,22 +2927,22 @@ function App() {
             {historyView === 'detail' && selectedHistory && (
               <div className="history-detail">
                 <BitsSurface className="history-detail-summary">
-                  <div><span>TOTAL</span><strong>฿{Number(selectedHistory.total).toFixed(2)}</strong></div>
-                  <small>{new Date(selectedHistory.updatedAt).toLocaleString()}</small>
+                  <div><span>{t("TOTAL")}</span><strong>฿{Number(selectedHistory.total).toFixed(2)}</strong></div>
+                  <small>{new Date(selectedHistory.updatedAt).toLocaleString(intlLocale())}</small>
                 </BitsSurface>
 
-                <h3>Items and sharing</h3>
+                <h3>{t("Items and sharing")}</h3>
                 <div className="history-food-list">
                   {selectedHistory.billItems.map((item, index) => (
                     <BitsSurface as="article" className="history-food-row" key={`${item.name}-${index}`}>
-                      <div><strong>{item.name}</strong><span>×{item.quantity} · split between {(selectedHistory.allocations[index] || []).length}</span></div>
+                      <div><strong>{item.name}</strong><span>×{item.quantity} · {t('split between')} {(selectedHistory.allocations[index] || []).length}</span></div>
                       <b>฿{Number(item.amount).toFixed(2)}</b>
-                      <p>{(selectedHistory.allocations[index] || []).join(', ') || 'No one selected'}</p>
+                      <p>{(selectedHistory.allocations[index] || []).join(', ') || t("No one selected")}</p>
                     </BitsSurface>
                   ))}
                 </div>
 
-                <h3>Who pays</h3>
+                <h3>{t("Who pays")}</h3>
                 <div className="history-payment-list">
                   {selectedHistory.settlements.map((settlement) => (
                     <BitsSurface className="history-payment-row" key={settlement.name}>
@@ -2944,7 +2952,7 @@ function App() {
                 </div>
                 {error && <p className="form-error" role="alert">{error}</p>}
                 <BitsButton type="button" className="download-button history-download-button" onClick={() => downloadSummary(selectedHistory)}>
-                  Download as picture
+                  {t('Download as picture')}
                 </BitsButton>
                 {!selectedHistory.isShared && <BillShareQr record={selectedHistory} />}
               </div>
@@ -2955,10 +2963,10 @@ function App() {
 
       {billPhotoOpen && billImageUrl && createPortal(
         <div className="bill-photo-modal-backdrop" role="presentation" onPointerDown={() => setBillPhotoOpen(false)}>
-          <section className="bill-photo-modal" role="dialog" aria-modal="true" aria-label="Bill photo preview" onPointerDown={(event) => event.stopPropagation()}>
-            <button type="button" className="bill-photo-modal-close" onClick={() => setBillPhotoOpen(false)} aria-label="Close bill photo">×</button>
-            <strong>Bill photo</strong>
-            <div><img src={billImageUrl} alt="Large preview of the selected bill" /></div>
+          <section className="bill-photo-modal" role="dialog" aria-modal="true" aria-label={t("Bill photo preview")} onPointerDown={(event) => event.stopPropagation()}>
+            <button type="button" className="bill-photo-modal-close" onClick={() => setBillPhotoOpen(false)} aria-label={t("Close bill photo")}>×</button>
+            <strong>{t("Bill photo")}</strong>
+            <div><img src={billImageUrl} alt={t("Large preview of the selected bill")} /></div>
           </section>
         </div>,
         document.body,

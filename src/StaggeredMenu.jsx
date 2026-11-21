@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { t } from './i18n';
 
 export default function StaggeredMenu({
   children,
@@ -63,7 +64,7 @@ export default function StaggeredMenu({
         ref={toggleRef}
         className="staggered-menu-toggle"
         type="button"
-        aria-label={isOpen ? 'Close history menu' : 'Open history menu'}
+        aria-label={isOpen ? 'Close history menu' : t("Open history menu")}
         aria-expanded={isOpen}
         aria-controls="history-staggered-menu"
         onClick={toggleMenu}
@@ -74,7 +75,7 @@ export default function StaggeredMenu({
       <button
         className="staggered-menu-backdrop"
         type="button"
-        aria-label="Close history menu"
+        aria-label={t("Close history menu")}
         tabIndex={isOpen ? 0 : -1}
         onClick={closeMenu}
       />
@@ -87,7 +88,7 @@ export default function StaggeredMenu({
         className="staggered-menu-panel"
         aria-hidden={!isOpen}
         inert={!isOpen}
-        aria-label="History"
+        aria-label={t("History")}
         tabIndex={-1}
       >
         {children}

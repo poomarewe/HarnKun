@@ -2436,3 +2436,8 @@ html[data-theme='dark'] .home-header h1 {
     transition-duration: 0.18s;
   }
 }
+
+/* Thai script has tall tone marks, so it needs more vertical room than Latin text. */
+html[lang='th'] :is(h1, h2, h3, h4, p, label, span, strong, small, button, a) {
+  line-height: 1.45;
+}
