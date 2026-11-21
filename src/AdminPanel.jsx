@@ -32,6 +32,7 @@ export default function AdminPanel() {
   const [bills, setBills] = useState([]);
   const [billCursor, setBillCursor] = useState(null);
   const [billsLoading, setBillsLoading] = useState(false);
+  const [messages, setMessages] = useState([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(null);
@@ -74,9 +75,24 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const loadMessages = useCallback(async () => {
+    try {
+      const data = await readJson(await fetch('/api/admin-messages', {
+        credentials: 'same-origin', cache: 'no-store',
+      }));
+      setMessages(data.messages);
+    } catch (loadError) {
+      setError(loadError.message);
+    }
+  }, []);
+
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    if (view === 'dashboard') loadMessages();
+  }, [view, loadMessages]);
 
   useEffect(() => {
     if (view === 'dashboard') loadBills();
@@ -289,6 +305,30 @@ export default function AdminPanel() {
         {billCursor && <button className="admin-secondary-button" type="button" disabled={billsLoading} onClick={() => loadBills(billCursor, true)}>
           {billsLoading ? 'Loading…' : 'Load more bills'}
         </button>}
+      </section>
+
+      <section className="admin-history-card admin-messages-card" aria-labelledby="admin-messages-title">
+        <div className="admin-section-heading">
+          <div>
+            <p className="admin-eyebrow">Sent from the home screen</p>
+            <h2 id="admin-messages-title">Messages from users</h2>
+          </div>
+          <span>Latest 100 messages</span>
+        </div>
+        {messages.length === 0 ? <p>No messages yet.</p> : (
+          <div className="admin-bill-list">
+            {messages.map(entry => (
+              <details className="admin-bill-row" key={entry.id}>
+                <summary>
+                  <span>{formatTimestamp(entry.createdAt)}</span>
+                  <span>{entry.deviceType || 'Unknown device'} · {entry.browser || 'Unknown browser'} · {entry.visitorId || 'No browser ID'}</span>
+                  <span>{entry.contact || 'No contact given'}</span>
+                </summary>
+                <p className="admin-message-body">{entry.message}</p>
+              </details>
+            ))}
+          </div>
+        )}
       </section>
 
       <footer className="admin-footer">

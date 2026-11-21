@@ -537,3 +537,5 @@
   .admin-metric strong { text-align: left; }
   .admin-metric small { grid-column: auto; }
 }
+
+.admin-message-body { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -666,6 +666,11 @@ function App() {
   const [historySort, setHistorySort] = useState('newest');
   const [sortDrawerOpen, setSortDrawerOpen] = useState(false);
   const [clearHistoryConfirmOpen, setClearHistoryConfirmOpen] = useState(false);
+  const [adminMessageOpen, setAdminMessageOpen] = useState(false);
+  const [adminMessageDraft, setAdminMessageDraft] = useState('');
+  const [adminMessageContact, setAdminMessageContact] = useState('');
+  const [adminMessageSending, setAdminMessageSending] = useState(false);
+  const [adminMessageStatus, setAdminMessageStatus] = useState('');
   const [menuOpenRequest, setMenuOpenRequest] = useState(0);
   const [menuCloseRequest, setMenuCloseRequest] = useState(0);
   const [homeHistorySwipe, setHomeHistorySwipe] = useState({ id: null, offset: 0, holding: false });
@@ -784,7 +789,7 @@ function App() {
 
   useEffect(() => {
     if (!showIntro) return undefined;
-    const finishIntro = window.setTimeout(() => setShowIntro(false), 3900);
+    const finishIntro = window.setTimeout(() => setShowIntro(false), 1850);
     return () => window.clearTimeout(finishIntro);
   }, [showIntro]);
 
@@ -2782,6 +2787,82 @@ function App() {
 
         {historyDeleteInputLocked && (
           <div className="history-delete-input-shield" aria-hidden="true" />
+        )}
+
+        {!isCreating && !showIntro && !isSharedHistoryRoute && (
+          <>
+            <button
+              type="button"
+              className="home-admin-message-fab"
+              aria-label="Send a message to the admin"
+              title="Send a message to the admin"
+              onClick={() => { setAdminMessageStatus(''); setAdminMessageOpen(true); }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 21 3l-5.5 18-4-7.5L3 11.5Z" /><path d="M11.5 13.5 21 3" /></svg>
+            </button>
+            {adminMessageOpen && (
+              <div className="home-confirm-backdrop home-admin-message-backdrop" role="presentation" onPointerDown={() => { if (!adminMessageSending) setAdminMessageOpen(false); }}>
+                <BitsSurface className="home-confirm-dialog home-admin-message-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-message-title" onPointerDown={(event) => event.stopPropagation()}>
+                  <form onSubmit={async (event) => {
+                    event.preventDefault();
+                    const text = adminMessageDraft.trim();
+                    if (!text || adminMessageSending) return;
+                    setAdminMessageSending(true);
+                    setAdminMessageStatus('');
+                    try {
+                      const response = await fetch('/api/admin-messages', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ message: text, contact: adminMessageContact.trim() }),
+                      });
+                      const data = await response.json().catch(() => ({}));
+                      if (!response.ok) throw new Error(data.message || 'Could not send your message.');
+                      setAdminMessageDraft('');
+                      setAdminMessageContact('');
+                      setAdminMessageStatus('Thanks! Your message was sent to the admin.');
+                    } catch (sendError) {
+                      setAdminMessageStatus(sendError.message || 'Could not send your message.');
+                    } finally {
+                      setAdminMessageSending(false);
+                    }
+                  }}>
+                    <div className="home-confirm-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M3 11.5 21 3l-5.5 18-4-7.5L3 11.5Z" /><path d="M11.5 13.5 21 3" /></svg>
+                    </div>
+                    <span>REPORT OR FEEDBACK</span>
+                    <h2 id="admin-message-title">Message the admin</h2>
+                    <label className="home-admin-message-field">
+                      <span>Your message</span>
+                      <textarea
+                        value={adminMessageDraft}
+                        maxLength={1000}
+                        rows={4}
+                        required
+                        placeholder="Report a problem, or share an idea…"
+                        onChange={(event) => setAdminMessageDraft(event.target.value)}
+                      />
+                    </label>
+                    <label className="home-admin-message-field">
+                      <span>Contact (optional)</span>
+                      <input
+                        type="text"
+                        value={adminMessageContact}
+                        maxLength={120}
+                        placeholder="Name, email or LINE ID"
+                        onChange={(event) => setAdminMessageContact(event.target.value)}
+                      />
+                    </label>
+                    {adminMessageStatus && <p className="home-admin-message-status" role="status">{adminMessageStatus}</p>}
+                    <div className="home-confirm-actions">
+                      <BitsButton type="button" disabled={adminMessageSending} onClick={() => setAdminMessageOpen(false)}>Close</BitsButton>
+                      <BitsButton type="submit" disabled={adminMessageSending || !adminMessageDraft.trim()}>{adminMessageSending ? 'Sending…' : 'Send'}</BitsButton>
+                    </div>
+                  </form>
+                </BitsSurface>
+              </div>
+            )}
+          </>
         )}
 
         {clearHistoryConfirmOpen && (

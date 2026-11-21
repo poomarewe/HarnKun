@@ -12,6 +12,7 @@ import analyticsBillsHandler from './api/analytics-bills.js';
 import analyticsRevokeHandler from './api/analytics-revoke.js';
 import adminBillsHandler from './api/admin-bills.js';
 import analyticsCleanupHandler from './api/analytics-cleanup.js';
+import adminMessagesHandler from './api/admin-messages.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -59,6 +60,7 @@ mountWebHandler('/api/admin-login', adminLoginHandler);
 mountWebHandler('/api/admin-dashboard', adminDashboardHandler);
 mountWebHandler('/api/admin-bills', adminBillsHandler);
 mountWebHandler('/api/admin-logout', adminLogoutHandler);
+mountWebHandler('/api/admin-messages', adminMessagesHandler);
 
 // Share the production handlers so local QA exercises the same validation.
 mountWebHandler('/api/operations', operationsHandler);
