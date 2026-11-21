@@ -2598,6 +2598,7 @@ function App() {
           <button
             type="button"
             className="home-admin-message-fab home-admin-message-fab-logo"
+            data-label="Feedback"
             aria-label="Send a message to the admin"
             title="Send a message to the admin"
             onClick={() => { setAdminMessageStatus(''); setAdminMessageOpen(true); }}
@@ -2616,24 +2617,12 @@ function App() {
           <p>Split bills with friends, scan receipts, and see who owes what.</p>
           <div className="home-hero">
             <div className="home-hero-copy">
-              <span>LESS MATH. MORE MEMORIES.</span>
-              <h2><span className="mobile-hero-title">Good times.<br /><em>Fair shares.</em></span><span className="desktop-hero-title">GOOD TIMES.<br />FAIR SHARES.</span></h2>
-              <p>Split the bill with your people, minus the awkward math.</p>
-              <div className="home-scroll-cue" aria-hidden="true">
-                <span>Scroll Down</span>
-                <svg viewBox="0 0 20 20"><path d="M10 3v12m-5-5 5 5 5-5" /></svg>
-              </div>
+              <p className="home-hero-tagline">Split the bill with your people, minus the awkward math.</p>
             </div>
-            <svg className="home-hero-art" viewBox="0 0 112 132" aria-hidden="true">
-              <path className="hero-sun" d="M28 6c10 0 18 8 18 18S38 42 28 42 10 34 10 24 18 6 28 6Z" />
-              <g className="hero-receipt" transform="rotate(8 69 72)">
-                <path d="M42 35h58v78l-6-3-6 4-7-4-6 4-7-4-6 4-7-4-7 4-8-4V35Z" />
-                <path className="receipt-line" d="M52 51h25m-25 10h38m-38 11h31m-31 11h38m-38 11h21" />
-                <path className="receipt-total" d="M52 104h38" />
-              </g>
-              <path className="hero-spark" d="m99 19 2.5 5.5L107 27l-5.5 2.5L99 35l-2.5-5.5L91 27l5.5-2.5L99 19Z" />
-              <path className="hero-leaf" d="M29 47c8-2 13 1 14 8-7 2-12-1-14-8Z" />
-            </svg>
+          </div>
+          <div className="home-scroll-cue" aria-hidden="true">
+            <span>Scroll Down</span>
+            <svg viewBox="0 0 20 20"><path d="M10 3v12m-5-5 5 5 5-5" /></svg>
           </div>
         </header>
         </section>
@@ -2810,6 +2799,7 @@ function App() {
             <button
               type="button"
               className="home-admin-message-fab"
+              data-label="Feedback"
               aria-label="Send a message to the admin"
               title="Send a message to the admin"
               onClick={() => { setAdminMessageStatus(''); setAdminMessageOpen(true); }}

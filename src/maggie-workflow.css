@@ -1570,3 +1570,28 @@ html[data-theme] body .guided-flow .guided-footer.has-mobile-only-action { displ
   html[data-theme] body.keyboard-open .guided-flow .guided-entry-extra-actions > .guided-reveal.guided-photo-alternative { display: none; }
 }
 
+
+/* Step changes swipe horizontally: forward comes in from the right, back from the left. */
+html[data-theme] body .operation-panel.guided-flow.direction-forward { animation: flow-swipe-forward .46s cubic-bezier(.2,.8,.2,1) both; }
+html[data-theme] body .operation-panel.guided-flow.direction-backward { animation: flow-swipe-backward .46s cubic-bezier(.2,.8,.2,1) both; }
+html[data-theme] body .overlay.is-closing .operation-panel.guided-flow { animation: flow-exit .24s ease-in both; }
+@keyframes flow-swipe-forward { from { opacity: .4; transform: translateX(28%); } to { opacity: 1; transform: translateX(0); } }
+@keyframes flow-swipe-backward { from { opacity: .4; transform: translateX(-28%); } to { opacity: 1; transform: translateX(0); } }
+
+/* Staggered reveal: each step's content comes in one block after another. The footer buttons sit outside .guided-body, so they stay put. */
+@keyframes guided-reveal {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+html[data-theme] body .operation-panel.guided-flow .guided-body > * {
+  animation: guided-reveal .5s cubic-bezier(.2, .7, .2, 1) backwards;
+}
+html[data-theme] body .operation-panel.guided-flow .guided-body > *:nth-child(1) { animation-delay: 0ms; }
+html[data-theme] body .operation-panel.guided-flow .guided-body > *:nth-child(2) { animation-delay: 80ms; }
+html[data-theme] body .operation-panel.guided-flow .guided-body > *:nth-child(3) { animation-delay: 160ms; }
+html[data-theme] body .operation-panel.guided-flow .guided-body > *:nth-child(4) { animation-delay: 240ms; }
+html[data-theme] body .operation-panel.guided-flow .guided-body > *:nth-child(5) { animation-delay: 320ms; }
+html[data-theme] body .operation-panel.guided-flow .guided-body > *:nth-child(n+6) { animation-delay: 400ms; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme] body .operation-panel.guided-flow .guided-body > * { animation: none; }
+}
